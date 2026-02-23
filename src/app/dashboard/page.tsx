@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useDisconnect } from "wagmi";
 import { useAppStore } from "@/lib/store";
 import { t, axisLabel, AXIS_KEYS } from "@/lib/i18n";
 import {
@@ -23,13 +22,20 @@ import {
   cancelConnection,
   getIncomingRequests,
   getConnections,
+  getQuestionnaireProgress,
+  resetQuestionnaireResponses,
+  getReceivedPokes,
+  markPokesSeen,
+  getUnseenPokeCount,
+  sendPoke,
 } from "@/lib/api";
-import { CompassChart } from "@/components/compass-chart";
+import { PoliticalCompassChart } from "@/components/political-compass-chart";
 import { Compass3D } from "@/components/compass-3d";
-import { CompassResultCard } from "@/components/compass-result-card";
+import { toPng } from "html-to-image";
 import { QuestionCard } from "@/components/question-card";
-import { SettingsBar } from "@/components/settings-bar";
-import { Share2, LogOut, GitCompare, Clock, Check, ArrowUpRight, ArrowDownRight, Minus, Users, Shield, Eye, EyeOff, Loader2, Scan, Swords, Puzzle, Link, MessageSquare, X, Send, UserPlus, ExternalLink, BarChart3 } from "lucide-react";
+import { PageNavBar } from "@/components/page-nav-bar";
+import { Share2, GitCompare, Clock, Check, ArrowUpRight, ArrowDownRight, Minus, Users, Shield, Eye, EyeOff, Loader2, Scan, Swords, Puzzle, Link, MessageSquare, X, Send, UserPlus, ExternalLink, BarChart3, BookOpen, ArrowLeft, RotateCcw, CircleCheckBig, Download, Zap, MessageCircle } from "lucide-react";
+import { QuestionnaireIcon } from "@/components/questionnaire-icon";
 
 type Tab = "compass" | "session" | "history" | "community" | "wallet";
 
@@ -40,6 +46,22 @@ interface Snapshot {
   confidence: Record<string, number>;
   changeLog: string | null;
   createdAt: string;
+  questionnaireId?: string | null;
+  questionnaire?: { slug: string; title: string; titleFa: string; icon: string } | null;
+}
+
+interface QuestionnaireProgress {
+  questionnaireId: string;
+  slug: string;
+  title: string;
+  titleFa: string;
+  description: string;
+  descriptionFa: string;
+  icon: string;
+  total: number;
+  answered: number;
+  completed: boolean;
+  progress: number;
 }
 
 interface DiffResult {
@@ -102,12 +124,12 @@ type MatchMode = "mirror" | "challenger" | "complement";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { disconnect: disconnectWallet } = useDisconnect();
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
   const [tab, setTab] = useState<Tab>("compass");
   const [compassView, setCompassView] = useState<"2d" | "3d">("2d");
-  const [showExport, setShowExport] = useState(false);
+  const [showUserId, setShowUserId] = useState(false);
+  const compassChartRef = useRef<HTMLDivElement>(null);
   const [compass, setCompass] = useState<{
     dimensions: Record<string, number>;
     confidence: Record<string, number>;
@@ -116,6 +138,18 @@ export default function DashboardPage() {
   const [wallet, setWallet] = useState<WalletData | null>(null);
   const [snapshotName, setSnapshotName] = useState("");
   const [snapshotSaved, setSnapshotSaved] = useState(false);
+  const [profileCopied, setProfileCopied] = useState(false);
+
+  // Poke state
+  const [receivedPokes, setReceivedPokes] = useState<{
+    id: string;
+    senderId: string;
+    seen: boolean;
+    mutual: boolean;
+    createdAt: string;
+    sender: { displayName: string | null; walletAddress: string };
+  }[]>([]);
+  const [unseenPokeCount, setUnseenPokeCount] = useState(0);
 
   // Compare state
   const [compareIds, setCompareIds] = useState<string[]>([]);
@@ -150,6 +184,10 @@ export default function DashboardPage() {
   const [sessionDone, setSessionDone] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(false);
 
+  // Questionnaire state
+  const [selectedQuestionnaire, setSelectedQuestionnaire] = useState<QuestionnaireProgress | null>(null);
+  const [questionnaireProgress, setQuestionnaireProgress] = useState<QuestionnaireProgress[]>([]);
+
   useEffect(() => {
     if (!user) {
       router.push("/connect");
@@ -158,7 +196,7 @@ export default function DashboardPage() {
 
     async function load() {
       try {
-        const [compassData, historyData, walletData, freqData, matchSettingsData, incomingData, connectionsData] = await Promise.all([
+        const [compassData, historyData, walletData, freqData, matchSettingsData, incomingData, connectionsData, progressData, pokesData, pokeCountData] = await Promise.all([
           getCompass(user!.id),
           getHistory(user!.id),
           getWallet(user!.id).catch(() => null),
@@ -166,6 +204,9 @@ export default function DashboardPage() {
           getMatchSettings().catch(() => null),
           getIncomingRequests().catch(() => []),
           getConnections().catch(() => []),
+          getQuestionnaireProgress().catch(() => []),
+          getReceivedPokes().catch(() => []),
+          getUnseenPokeCount().catch(() => ({ count: 0 })),
         ]);
         setCompass(compassData);
         setHistory(historyData);
@@ -180,6 +221,9 @@ export default function DashboardPage() {
         }
         setIncomingRequests(incomingData ?? []);
         setConnections(connectionsData ?? []);
+        setQuestionnaireProgress(progressData ?? []);
+        setReceivedPokes(pokesData ?? []);
+        setUnseenPokeCount(pokeCountData?.count ?? 0);
       } catch (err) {
         console.error("Failed to load dashboard data:", err);
       }
@@ -187,6 +231,69 @@ export default function DashboardPage() {
 
     load();
   }, [user, router]);
+
+  const handleShareProfile = useCallback(async () => {
+    if (!user) return;
+    const profileUrl = `${window.location.origin}/profile/${user.id}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: t("profile_title", language), url: profileUrl });
+        return;
+      } catch { /* cancelled */ }
+    }
+    await navigator.clipboard.writeText(profileUrl);
+    setProfileCopied(true);
+    setTimeout(() => setProfileCopied(false), 2000);
+  }, [user, language]);
+
+  const handleDownloadDiagram = useCallback(async () => {
+    if (!compassChartRef.current) return;
+    try {
+      const el = compassChartRef.current;
+      const dataUrl = await toPng(el, {
+        width: el.offsetWidth * 2,
+        height: el.offsetHeight * 2,
+        canvasWidth: el.offsetWidth * 2,
+        canvasHeight: el.offsetHeight * 2,
+        pixelRatio: 2,
+        backgroundColor: "#111",
+        style: { transform: "scale(2)", transformOrigin: "top left" },
+      });
+      const link = document.createElement("a");
+      link.download = "civic-compass.png";
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error("Failed to download diagram:", err);
+    }
+  }, []);
+
+  const handleShareDiagram = useCallback(async () => {
+    if (!compassChartRef.current) return;
+    try {
+      const el = compassChartRef.current;
+      const dataUrl = await toPng(el, {
+        width: el.offsetWidth * 2,
+        height: el.offsetHeight * 2,
+        canvasWidth: el.offsetWidth * 2,
+        canvasHeight: el.offsetHeight * 2,
+        pixelRatio: 2,
+        backgroundColor: "#111",
+        style: { transform: "scale(2)", transformOrigin: "top left" },
+      });
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], "civic-compass.png", { type: "image/png" });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: "My Civic Compass" });
+      } else {
+        // Fallback: copy image URL to clipboard
+        await navigator.clipboard.writeText(window.location.href);
+        alert("Link copied to clipboard!");
+      }
+    } catch (err) {
+      console.error("Failed to share diagram:", err);
+    }
+  }, []);
 
   async function handleSaveSnapshot() {
     if (!user) return;
@@ -327,7 +434,7 @@ export default function DashboardPage() {
     if (!user) return;
     setSessionLoading(true);
     try {
-      const qs = await getNextQuestions(user.id, 3);
+      const qs = await getNextQuestions(user.id, 999, selectedQuestionnaire?.questionnaireId);
       setSessionQuestions(qs);
       setSessionIndex(0);
       setSessionDone(qs.length === 0);
@@ -344,6 +451,7 @@ export default function DashboardPage() {
     responseTimeMs: number
   ) {
     if (!user) return;
+    const qId = selectedQuestionnaire?.questionnaireId;
     try {
       await submitResponses(user.id, [
         { questionId, answerValue, responseTimeMs },
@@ -354,14 +462,24 @@ export default function DashboardPage() {
       } else {
         setSessionDone(true);
         // Refresh compass after session and auto-save snapshot
-        const compassData = await getCompass(user.id);
+        const compassData = await getCompass(user.id, qId);
         setCompass(compassData);
         try {
-          await saveSnapshot(user.id, `Session ${new Date().toISOString().split('T')[0]}`);
-          const updatedHistory = await getHistory(user.id);
+          const label = selectedQuestionnaire
+            ? `${selectedQuestionnaire.title} ${new Date().toISOString().split('T')[0]}`
+            : `Session ${new Date().toISOString().split('T')[0]}`;
+          await saveSnapshot(user.id, label, qId);
+          const updatedHistory = await getHistory(user.id, qId);
           setHistory(updatedHistory);
         } catch {
           // Non-critical — just skip auto-snapshot
+        }
+        // Refresh questionnaire progress
+        try {
+          const progressData = await getQuestionnaireProgress();
+          setQuestionnaireProgress(progressData ?? []);
+        } catch {
+          // ignore
         }
       }
     } catch (err) {
@@ -371,11 +489,11 @@ export default function DashboardPage() {
 
   if (!user) return null;
 
-  const tabs: { id: Tab; label: string }[] = [
+  const tabs: { id: Tab; label: string; badge?: number }[] = [
     { id: "compass", label: t("tab_compass", language) },
     { id: "session", label: t("tab_session", language) },
     { id: "history", label: t("tab_history", language) },
-    { id: "community", label: t("tab_community", language) },
+    { id: "community", label: t("tab_community", language), badge: unseenPokeCount },
     { id: "wallet", label: t("tab_wallet", language) },
   ];
 
@@ -383,21 +501,7 @@ export default function DashboardPage() {
     <main className="min-h-screen px-4 py-6 sm:px-6 sm:py-12 max-w-3xl mx-auto">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6 sm:mb-8">
         <h1 className="text-2xl font-bold glow-text">{t("dashboard_title", language)}</h1>
-        <div className="flex items-center gap-3">
-          <SettingsBar />
-          <button
-            onClick={() => {
-              disconnectWallet();
-              useAppStore.getState().logout();
-              router.push("/");
-            }}
-            className="btn-outline text-sm py-2 px-4 flex items-center gap-1.5"
-            style={{ color: "var(--text-muted)" }}
-          >
-            <LogOut size={14} strokeWidth={1.5} />
-            {t("disconnect", language)}
-          </button>
-        </div>
+        <PageNavBar showHome={false} />
       </div>
 
       {/* Tab bar */}
@@ -405,19 +509,29 @@ export default function DashboardPage() {
         className="grid grid-cols-5 sm:flex gap-1 rounded-xl p-1 mb-6 sm:mb-8"
         style={{ background: "var(--bg-card)" }}
       >
-        {tabs.map((t) => (
+        {tabs.map((tb) => (
           <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className="flex-1 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all"
+            key={tb.id}
+            onClick={() => {
+              setTab(tb.id);
+              if (tb.id === "community" && unseenPokeCount > 0) {
+                markPokesSeen().then(() => setUnseenPokeCount(0)).catch(() => {});
+              }
+            }}
+            className="relative flex-1 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all"
             style={{
               background:
-                tab === t.id ? "var(--accent-gradient)" : "transparent",
-              color: tab === t.id ? "#111111" : "var(--text-secondary)",
-              fontWeight: tab === t.id ? 700 : 500,
+                tab === tb.id ? "var(--accent-gradient)" : "transparent",
+              color: tab === tb.id ? "#111111" : "var(--text-secondary)",
+              fontWeight: tab === tb.id ? 700 : 500,
             }}
           >
-            {t.label}
+            {tb.label}
+            {tb.badge && tb.badge > 0 ? (
+              <span className="absolute -top-1 -right-1 sm:top-0 sm:right-0 min-w-[16px] h-4 flex items-center justify-center rounded-full text-[10px] font-bold px-1" style={{ background: "var(--error)", color: "#fff" }}>
+                {tb.badge}
+              </span>
+            ) : null}
           </button>
         ))}
       </div>
@@ -454,40 +568,70 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            {/* Share / Export toggle */}
-            <button
-              onClick={() => setShowExport((v) => !v)}
-              className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all"
-              style={{
-                background: showExport ? "var(--accent-gradient-soft)" : "var(--component-primary)",
-                border: `1px solid ${showExport ? "var(--border-accent)" : "var(--border-color)"}`,
-                color: showExport ? "var(--accent-primary)" : "var(--text-secondary)",
-              }}
-            >
-              <Share2 size={12} strokeWidth={1.5} />
-              {t("share", language)} / {t("download", language)}
-            </button>
+            {/* Download / Share */}
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setShowUserId((v) => !v)}
+                className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all"
+                style={{
+                  background: showUserId ? "var(--accent-gradient-soft)" : "var(--component-primary)",
+                  border: `1px solid ${showUserId ? "var(--border-accent)" : "var(--border-color)"}`,
+                  color: showUserId ? "var(--accent-primary)" : "var(--text-secondary)",
+                }}
+                title={t("toggle_id", language)}
+              >
+                {showUserId ? <EyeOff size={12} strokeWidth={1.5} /> : <Eye size={12} strokeWidth={1.5} />}
+                {t("show_id", language)}
+              </button>
+              <button
+                onClick={handleDownloadDiagram}
+                className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all"
+                style={{
+                  background: "var(--component-primary)",
+                  border: "1px solid var(--border-color)",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                <Download size={12} strokeWidth={1.5} />
+                {t("download", language)}
+              </button>
+              <button
+                onClick={handleShareDiagram}
+                className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all"
+                style={{
+                  background: "var(--component-primary)",
+                  border: "1px solid var(--border-color)",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                <Share2 size={12} strokeWidth={1.5} />
+                {t("share", language)}
+              </button>
+              <button
+                onClick={handleShareProfile}
+                className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all"
+                style={{
+                  background: profileCopied ? "var(--accent-gradient-soft)" : "var(--component-primary)",
+                  border: `1px solid ${profileCopied ? "var(--border-accent)" : "var(--border-color)"}`,
+                  color: profileCopied ? "var(--accent-primary)" : "var(--text-secondary)",
+                }}
+              >
+                <ExternalLink size={12} strokeWidth={1.5} />
+                {profileCopied ? t("copied", language) : t("share_profile", language)}
+              </button>
+            </div>
           </div>
-
-          {/* Compass visualization */}
           {compassView === "2d" ? (
-            <CompassChart
+            <PoliticalCompassChart
+              ref={compassChartRef}
               dimensions={compass.dimensions}
               confidence={compass.confidence}
+              userId={showUserId ? user?.id : undefined}
             />
           ) : (
             <Compass3D
               dimensions={compass.dimensions}
               confidence={compass.confidence}
-            />
-          )}
-
-          {/* Export card (collapsible) */}
-          {showExport && (
-            <CompassResultCard
-              dimensions={compass.dimensions}
-              confidence={compass.confidence}
-              language={language}
             />
           )}
 
@@ -521,16 +665,140 @@ export default function DashboardPage() {
       {/* Session tab */}
       {tab === "session" && (
         <div className="space-y-6">
-          {sessionQuestions.length === 0 && !sessionDone && !sessionLoading ? (
+          {/* No questionnaire selected — show selector */}
+          {!selectedQuestionnaire && sessionQuestions.length === 0 && !sessionDone ? (
+            <div className="space-y-6">
+              <div className="text-center space-y-2">
+                <BookOpen size={32} strokeWidth={1.5} className="mx-auto" style={{ color: "var(--accent-primary)" }} />
+                <h2 className="text-xl font-semibold">{t("questionnaire_choose", language)}</h2>
+                <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                  {t("session_ready_desc", language)}
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {questionnaireProgress.map((qp) => (
+                  <div
+                    key={qp.questionnaireId}
+                    onClick={() => {
+                      setSelectedQuestionnaire(qp);
+                      setSessionQuestions([]);
+                      setSessionDone(false);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    className="text-left rounded-2xl p-5 transition-all hover:scale-[1.02] cursor-pointer"
+                    style={{
+                      background: "var(--bg-card)",
+                      border: "1px solid var(--border-color)",
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <QuestionnaireIcon
+                        name={qp.icon}
+                        size={28}
+                        strokeWidth={1.5}
+                        style={{ color: "var(--accent-primary)" }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm">
+                          {language === "fa" ? qp.titleFa : qp.title}
+                        </h3>
+                        <p className="text-xs mt-1 line-clamp-2" style={{ color: "var(--text-secondary)" }}>
+                          {language === "fa" ? qp.descriptionFa : qp.description}
+                        </p>
+                        <div className="mt-3 flex items-center gap-2">
+                          <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--component-primary)" }}>
+                            <div
+                              className="h-full rounded-full transition-all"
+                              style={{
+                                width: `${qp.progress}%`,
+                                background: qp.completed ? "var(--success)" : "var(--accent-gradient)",
+                              }}
+                            />
+                          </div>
+                          <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+                            {qp.answered}/{qp.total}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex items-center gap-2">
+                          {qp.completed ? (
+                            <>
+                              <span className="text-xs font-medium flex items-center gap-1" style={{ color: "var(--success)" }}>
+                                <Check size={12} strokeWidth={1.5} /> {t("questionnaire_completed", language)}
+                              </span>
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (!user) return;
+                                  try {
+                                    // Save current state as snapshot before resetting
+                                    const label = language === "fa" ? qp.titleFa : qp.title;
+                                    await saveSnapshot(user.id, `Pre-retake: ${label}`, qp.questionnaireId);
+                                    // Reset responses for this questionnaire
+                                    await resetQuestionnaireResponses(qp.questionnaireId);
+                                    // Refresh progress
+                                    const prog = await getQuestionnaireProgress();
+                                    setQuestionnaireProgress(prog);
+                                  } catch (err) {
+                                    console.error("Retake failed:", err);
+                                  }
+                                }}
+                                className="text-xs font-medium flex items-center gap-1 px-2 py-0.5 rounded-lg transition-colors hover:opacity-80"
+                                style={{ color: "var(--accent-primary)", background: "var(--component-primary)" }}
+                              >
+                                <RotateCcw size={12} strokeWidth={1.5} /> {t("questionnaire_retake", language)}
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-xs font-medium" style={{ color: "var(--accent-primary)" }}>
+                              {qp.answered > 0 ? t("questionnaire_continue", language) : t("questionnaire_start", language)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {questionnaireProgress.length === 0 && (
+                <p className="text-center py-8 text-sm" style={{ color: "var(--text-muted)" }}>
+                  {t("loading_questions", language)}
+                </p>
+              )}
+            </div>
+          ) : !selectedQuestionnaire && sessionQuestions.length === 0 && !sessionDone ? (
+            /* Fallback — shouldn't reach here */
+            null
+          ) : selectedQuestionnaire && sessionQuestions.length === 0 && !sessionDone && !sessionLoading ? (
+            /* Questionnaire selected, ready to start */
             <div className="text-center py-12 space-y-4">
-              <div className="text-5xl">🎯</div>
-              <h2 className="text-xl font-semibold">{t("session_ready_title", language)}</h2>
-              <p style={{ color: "var(--text-secondary)" }}>
-                {t("session_ready_desc", language)}
+              <QuestionnaireIcon
+                name={selectedQuestionnaire.icon}
+                size={40}
+                strokeWidth={1.5}
+                style={{ color: "var(--accent-primary)" }}
+              />
+              <h2 className="text-xl font-semibold">
+                {language === "fa" ? selectedQuestionnaire.titleFa : selectedQuestionnaire.title}
+              </h2>
+              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                {language === "fa" ? selectedQuestionnaire.descriptionFa : selectedQuestionnaire.description}
               </p>
-              <button onClick={loadSession} className="btn-primary mx-auto">
-                {t("start_session", language)}
-              </button>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                {t("questionnaire_questions", language, { count: selectedQuestionnaire.total })} · {selectedQuestionnaire.answered} {t("questionnaire_progress", language)}
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <button onClick={loadSession} className="btn-primary">
+                  {selectedQuestionnaire.answered > 0 ? t("questionnaire_continue", language) : t("questionnaire_start", language)}
+                </button>
+                <button
+                  onClick={() => { setSelectedQuestionnaire(null); }}
+                  className="btn-outline flex items-center gap-1.5 justify-center"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  <ArrowLeft size={14} strokeWidth={1.5} /> {t("questionnaire_back", language)}
+                </button>
+              </div>
             </div>
           ) : sessionLoading ? (
             <p className="text-center py-12" style={{ color: "var(--text-secondary)" }}>
@@ -538,7 +806,7 @@ export default function DashboardPage() {
             </p>
           ) : sessionDone ? (
             <div className="text-center py-12 space-y-4">
-              <div className="text-5xl">✅</div>
+              <CircleCheckBig size={48} strokeWidth={1.5} style={{ color: "var(--accent-primary)" }} />
               <h2 className="text-xl font-semibold text-gradient">{t("session_complete", language)}</h2>
               <p style={{ color: "var(--text-secondary)" }}>
                 {sessionQuestions.length === 0
@@ -563,19 +831,53 @@ export default function DashboardPage() {
                 >
                   {t("another_round", language)}
                 </button>
+                <button
+                  onClick={() => {
+                    setSelectedQuestionnaire(null);
+                    setSessionQuestions([]);
+                    setSessionDone(false);
+                  }}
+                  className="btn-outline flex items-center gap-1.5 justify-center"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  <ArrowLeft size={14} strokeWidth={1.5} /> {t("questionnaire_back", language)}
+                </button>
               </div>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                  {t("question_of", language, { current: sessionIndex + 1, total: sessionQuestions.length })}
-                </p>
-                <div className="flex gap-1.5">
+                <div className="flex items-center gap-2">
+                  {selectedQuestionnaire && (
+                    <button
+                      onClick={() => {
+                        setSelectedQuestionnaire(null);
+                        setSessionQuestions([]);
+                        setSessionDone(false);
+                      }}
+                      className="p-1 rounded-lg transition-colors hover:bg-white/5"
+                    >
+                      <ArrowLeft size={16} strokeWidth={1.5} style={{ color: "var(--text-secondary)" }} />
+                    </button>
+                  )}
+                  <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                    {selectedQuestionnaire && (
+                      <QuestionnaireIcon
+                        name={selectedQuestionnaire.icon}
+                        size={14}
+                        strokeWidth={1.5}
+                        className="mr-1 inline-block"
+                        style={{ color: "var(--accent-primary)" }}
+                      />
+                    )}
+                    {t("question_of", language, { current: sessionIndex + 1, total: sessionQuestions.length })}
+                  </p>
+                </div>
+                <div className="flex gap-1 flex-wrap max-w-full">
                   {sessionQuestions.map((_, i) => (
                     <div
                       key={i}
-                      className="w-3 h-3 rounded-full transition-all"
+                      className="w-2.5 h-2.5 rounded-full transition-all flex-shrink-0"
                       style={{
                         background:
                           i < sessionIndex
@@ -708,7 +1010,7 @@ export default function DashboardPage() {
 
                   {/* Overlay comparison chart */}
                   <div className="mt-4">
-                    <CompassChart
+                    <PoliticalCompassChart
                       dimensions={diffResult.to.dimensions}
                       confidence={{}}
                       overlayDimensions={diffResult.from.dimensions}
@@ -842,6 +1144,87 @@ export default function DashboardPage() {
       {/* Community tab */}
       {tab === "community" && (
         <div className="space-y-6">
+          {/* Received Pokes */}
+          {receivedPokes.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <Zap size={14} strokeWidth={1.5} style={{ color: "var(--accent-primary)" }} />
+                {t("pokes_title", language)}
+                <span className="text-xs font-mono rounded-full px-2 py-0.5" style={{ background: "var(--accent-gradient-soft)", color: "var(--accent-primary)" }}>
+                  {receivedPokes.length}
+                </span>
+              </h3>
+              <div className="space-y-2">
+                {receivedPokes.map((poke) => (
+                  <div key={poke.id} className="card p-4" style={{ border: poke.seen ? undefined : "1px solid var(--border-accent)" }}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                          style={{
+                            background: poke.mutual ? "var(--accent-gradient)" : "var(--accent-gradient-soft)",
+                            color: poke.mutual ? "#111" : "var(--accent-primary)",
+                            border: `1px solid ${poke.mutual ? "transparent" : "var(--border-accent)"}`,
+                          }}
+                        >
+                          {poke.mutual ? <MessageCircle size={14} strokeWidth={1.5} /> : <Zap size={14} strokeWidth={1.5} />}
+                        </div>
+                        <div>
+                          <button
+                            className="text-sm font-medium hover:underline"
+                            onClick={() => router.push(`/profile/${poke.senderId}`)}
+                          >
+                            {poke.sender.displayName || t("anonymous_user", language)}
+                          </button>
+                          <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                            {poke.mutual ? t("poke_mutual", language) : t("poke_from", language)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        {poke.mutual ? (
+                          <a
+                            href={`https://chat.blockscan.com/eth/${poke.sender.walletAddress}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-primary text-xs py-1.5 px-4 flex items-center gap-1.5"
+                          >
+                            <MessageSquare size={12} strokeWidth={1.5} />
+                            {t("chat_blockscan", language)}
+                            <ExternalLink size={10} strokeWidth={1.5} />
+                          </a>
+                        ) : (
+                          <button
+                            onClick={async () => {
+                              try {
+                                const result = await sendPoke(poke.senderId);
+                                // Refresh pokes
+                                const updated = await getReceivedPokes();
+                                setReceivedPokes(updated ?? []);
+                              } catch (err) {
+                                console.error("Failed to poke back:", err);
+                              }
+                            }}
+                            className="btn-primary text-xs py-1.5 px-4 flex items-center gap-1.5"
+                          >
+                            <Zap size={12} strokeWidth={1.5} />
+                            {t("poke_back", language)}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => router.push(`/profile/${poke.senderId}`)}
+                          className="btn-outline text-xs py-1.5 px-3 flex items-center gap-1"
+                        >
+                          <ExternalLink size={12} strokeWidth={1.5} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Privacy settings card */}
           <div className="card p-5 space-y-4">
             <div className="flex items-center gap-2 mb-1">
@@ -1022,7 +1405,7 @@ export default function DashboardPage() {
                   {/* Expanded: compass overlay + connection action */}
                   {expandedMatch === m.userId && compass && (
                     <div className="px-4 pb-4 pt-0 space-y-3">
-                      <CompassChart
+                      <PoliticalCompassChart
                         dimensions={m.dimensions}
                         confidence={{}}
                         overlayDimensions={compass.dimensions}

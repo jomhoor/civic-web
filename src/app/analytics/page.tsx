@@ -39,6 +39,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { SettingsBar } from "@/components/settings-bar";
+import { PageNavBar } from "@/components/page-nav-bar";
 
 /* ── Axis colours (Republic palette) ── */
 const AXIS_COLORS: Record<string, string> = {
@@ -187,26 +188,10 @@ export default function AnalyticsPage() {
 
   return (
     <main className="min-h-screen" style={{ background: "var(--bg-primary)" }}>
-      <SettingsBar />
-
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        <PageNavBar className="mb-4" />
         {/* Header */}
         <div className="flex items-center gap-3 mb-2">
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="p-2 rounded-lg transition-colors"
-            style={{
-              background: "var(--component-primary)",
-              border: "1px solid var(--border-color)",
-            }}
-          >
-            <ArrowLeft
-              size={18}
-              strokeWidth={1.5}
-              style={{ color: "var(--text-secondary)" }}
-              className="rtl:rotate-180"
-            />
-          </button>
           <div>
             <h1
               className="text-2xl sm:text-3xl font-bold glow-text"

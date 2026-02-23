@@ -42,9 +42,21 @@ export function CompassResultCard({
   const handleDownload = useCallback(async () => {
     if (!cardRef.current) return;
     try {
-      const dataUrl = await toPng(cardRef.current, {
+      // Ensure the element is fully in view and rendered
+      const el = cardRef.current;
+      const width = el.offsetWidth;
+      const height = el.offsetHeight;
+      const dataUrl = await toPng(el, {
         pixelRatio: 3,
         backgroundColor: "#111111",
+        width,
+        height,
+        style: {
+          transform: "none",
+          margin: "0",
+        },
+        canvasWidth: width * 3,
+        canvasHeight: height * 3,
       });
       const link = document.createElement("a");
       link.download = `civic-compass-${Date.now()}.png`;
@@ -68,9 +80,13 @@ export function CompassResultCard({
         // Capture image for native share
         let file: File | undefined;
         if (cardRef.current) {
-          const dataUrl = await toPng(cardRef.current, {
+          const el = cardRef.current;
+          const dataUrl = await toPng(el, {
             pixelRatio: 2,
             backgroundColor: "#111111",
+            width: el.offsetWidth,
+            height: el.offsetHeight,
+            style: { transform: "none", margin: "0" },
           });
           const res = await fetch(dataUrl);
           const blob = await res.blob();
@@ -109,7 +125,7 @@ export function CompassResultCard({
         style={{
           background: "linear-gradient(145deg, #111111 0%, #1a1a2e 100%)",
           borderRadius: "20px",
-          padding: "clamp(16px, 4vw, 32px) clamp(12px, 3vw, 28px)",
+          padding: "28px 24px",
           maxWidth: "480px",
           width: "100%",
           margin: "0 auto",
@@ -158,7 +174,7 @@ export function CompassResultCard({
                 {/* Label */}
                 <div
                   style={{
-                    width: "clamp(60px, 20vw, 90px)",
+                    width: "90px",
                     fontSize: "11px",
                     fontWeight: 600,
                     color,

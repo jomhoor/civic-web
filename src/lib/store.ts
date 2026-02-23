@@ -18,11 +18,15 @@ interface AppState {
   theme: Theme;
   language: Language;
   fontSize: FontSize;
+  hasVisited: boolean;
+  hasOnboarded: boolean;
   setAuth: (user: User, token: string) => void;
   logout: () => void;
   setTheme: (theme: Theme) => void;
   setLanguage: (language: Language) => void;
   setFontSize: (fontSize: FontSize) => void;
+  markVisited: () => void;
+  markOnboarded: () => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -33,12 +37,30 @@ export const useAppStore = create<AppState>()(
       theme: "dark",
       language: "en",
       fontSize: "normal",
-      setAuth: (user, token) => set({ user, token }),
+      hasVisited: false,
+      hasOnboarded: false,
+      setAuth: (user, token) => set({ user, token, hasVisited: true, hasOnboarded: true }),
       logout: () => set({ user: null, token: null }),
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
       setFontSize: (fontSize) => set({ fontSize }),
+      markVisited: () => set({ hasVisited: true }),
+      markOnboarded: () => set({ hasOnboarded: true }),
     }),
-    { name: "civic-compass-store" }
+    {
+      name: "civic-compass-store",
+      version: 1,
+      migrate: (persisted: unknown, version: number) => {
+        const state = persisted as Record<string, unknown>;
+        if (version === 0) {
+          // Existing users who already have a user/token are returning users
+          if (state.user && state.token) {
+            state.hasVisited = true;
+            state.hasOnboarded = true;
+          }
+        }
+        return state as unknown as AppState;
+      },
+    }
   )
 );

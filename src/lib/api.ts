@@ -53,16 +53,29 @@ export async function activateResearch(userId: string, inviteCode: string) {
   return data;
 }
 
-// --- Questions ---
-export async function getCalibrationQuestions() {
-  const { data } = await api.get("/questions/calibration");
+// --- Questionnaires ---
+export async function getQuestionnaires() {
+  const { data } = await api.get("/questionnaires");
   return data;
 }
 
-export async function getNextQuestions(userId: string, count = 3) {
-  const { data } = await api.get("/questions/next", {
-    params: { userId, count },
+export async function getQuestionnaireProgress() {
+  const { data } = await api.get("/questionnaires/progress");
+  return data;
+}
+
+// --- Questions ---
+export async function getCalibrationQuestions(questionnaireId?: string) {
+  const { data } = await api.get("/questions/calibration", {
+    params: questionnaireId ? { questionnaireId } : {},
   });
+  return data;
+}
+
+export async function getNextQuestions(userId: string, count = 3, questionnaireId?: string) {
+  const params: Record<string, string | number> = { userId, count };
+  if (questionnaireId) params.questionnaireId = questionnaireId;
+  const { data } = await api.get("/questions/next", { params });
   return data;
 }
 
@@ -80,22 +93,37 @@ export async function submitResponses(
   return data;
 }
 
-// --- Compass ---
-export async function getCompass(userId: string) {
-  const { data } = await api.get("/compass", { params: { userId } });
+export async function resetQuestionnaireResponses(questionnaireId: string) {
+  const { data } = await api.delete(`/responses/questionnaire/${questionnaireId}`);
   return data;
 }
 
-export async function saveSnapshot(userId: string, snapshotName?: string) {
+// --- Compass ---
+export async function getCompass(userId: string, questionnaireId?: string) {
+  const params: Record<string, string> = { userId };
+  if (questionnaireId) params.questionnaireId = questionnaireId;
+  const { data } = await api.get("/compass", { params });
+  return data;
+}
+
+export async function getPublicProfile(userId: string) {
+  const { data } = await api.get(`/compass/profile/${userId}`);
+  return data;
+}
+
+export async function saveSnapshot(userId: string, snapshotName?: string, questionnaireId?: string) {
   const { data } = await api.post("/compass/snapshot", {
     userId,
     snapshotName,
+    questionnaireId,
   });
   return data;
 }
 
-export async function getHistory(userId: string) {
-  const { data } = await api.get("/compass/history", { params: { userId } });
+export async function getHistory(userId: string, questionnaireId?: string) {
+  const params: Record<string, string> = { userId };
+  if (questionnaireId) params.questionnaireId = questionnaireId;
+  const { data } = await api.get("/compass/history", { params });
   return data;
 }
 
@@ -209,5 +237,31 @@ export async function getAnalyticsTrends(months = 12, country?: string) {
   const { data } = await api.get("/analytics/trends", {
     params: { months, ...(country ? { country } : {}) },
   });
+  return data;
+}
+
+// --- Poke ---
+export async function sendPoke(targetUserId: string) {
+  const { data } = await api.post(`/poke/${targetUserId}`);
+  return data;
+}
+
+export async function getReceivedPokes() {
+  const { data } = await api.get("/poke");
+  return data;
+}
+
+export async function getUnseenPokeCount() {
+  const { data } = await api.get("/poke/unseen-count");
+  return data;
+}
+
+export async function markPokesSeen() {
+  const { data } = await api.post("/poke/mark-seen");
+  return data;
+}
+
+export async function getPokeStatus(targetUserId: string) {
+  const { data } = await api.get(`/poke/status/${targetUserId}`);
   return data;
 }

@@ -24,8 +24,10 @@ export default function WelcomePage() {
   const setLanguage = useAppStore((s) => s.setLanguage);
   const setTheme = useAppStore((s) => s.setTheme);
   const setFontSize = useAppStore((s) => s.setFontSize);
+  const markVisited = useAppStore((s) => s.markVisited);
 
   function handleContinue() {
+    markVisited();
     router.push("/connect");
   }
 

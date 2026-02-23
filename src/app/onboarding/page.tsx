@@ -6,6 +6,7 @@ import { useAppStore } from "@/lib/store";
 import { activateResearch } from "@/lib/api";
 import { ArrowRight } from "lucide-react";
 import { t } from "@/lib/i18n";
+import { PageNavBar } from "@/components/page-nav-bar";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -32,6 +33,7 @@ export default function OnboardingPage() {
       } else {
         // Update local user state with research participant flag
         setAuth(result.user, useAppStore.getState().token ?? "");
+        useAppStore.getState().markOnboarded();
         router.push("/calibration");
       }
     } catch {
@@ -43,6 +45,9 @@ export default function OnboardingPage() {
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-6 py-12">
+      <div className="w-full max-w-lg mb-4">
+        <PageNavBar showHome={false} />
+      </div>
       <div className="max-w-lg w-full space-y-10">
         {/* Manifesto */}
         <div className="text-center space-y-4">
@@ -112,7 +117,10 @@ export default function OnboardingPage() {
         {/* Continue */}
         <div className="text-center">
           <button
-            onClick={() => router.push("/calibration")}
+            onClick={() => {
+              useAppStore.getState().markOnboarded();
+              router.push("/calibration");
+            }}
             className="btn-primary text-lg"
           >
             {t("begin_calibration", language)}

@@ -1,5 +1,6 @@
 "use client";
 
+import { forwardRef } from "react";
 import {
   Radar,
   RadarChart,
@@ -31,7 +32,8 @@ interface CompassChartProps {
   overlayDimensions?: Record<string, number>;
 }
 
-export function CompassChart({ dimensions, confidence, overlayDimensions }: CompassChartProps) {
+export const CompassChart = forwardRef<HTMLDivElement, CompassChartProps>(
+  function CompassChart({ dimensions, confidence, overlayDimensions }, ref) {
   const language = useAppStore((s) => s.language);
   const theme = useAppStore((s) => s.theme);
 
@@ -53,7 +55,7 @@ export function CompassChart({ dimensions, confidence, overlayDimensions }: Comp
   const gridColor = theme === "light" ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)";
 
   return (
-    <div className="card p-3 sm:p-6 w-full max-w-lg mx-auto">
+    <div ref={ref} className="card p-3 sm:p-6 w-full max-w-lg mx-auto">
       <div className="w-full aspect-square max-h-[400px]">
       <ResponsiveContainer width="100%" height="100%">
         <RadarChart data={data} cx="50%" cy="50%" outerRadius="75%">
@@ -134,4 +136,4 @@ export function CompassChart({ dimensions, confidence, overlayDimensions }: Comp
       </div>
     </div>
   );
-}
+});

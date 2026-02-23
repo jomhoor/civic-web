@@ -29,7 +29,7 @@ const en = {
 
   // Session
   session_ready_title: "Ready to refine your compass?",
-  session_ready_desc: "Answer 3 more propositions to deepen your civic profile.",
+  session_ready_desc: "Choose a questionnaire and answer propositions to shape your civic profile.",
   start_session: "Start Session",
   loading_questions: "Loading questions…",
   session_complete: "Session Complete!",
@@ -38,6 +38,16 @@ const en = {
   view_compass: "View Compass",
   another_round: "Another Round",
   question_of: "Question {current} of {total}",
+
+  // Questionnaires
+  questionnaire_choose: "Choose a Questionnaire",
+  questionnaire_questions: "{count} questions",
+  questionnaire_progress: "answered",
+  questionnaire_completed: "Completed",
+  questionnaire_start: "Start",
+  questionnaire_continue: "Continue",
+  questionnaire_retake: "Retake",
+  questionnaire_back: "All Questionnaires",
 
   // History / Timeline
   no_snapshots: "No snapshots yet. Save your first one from the Compass tab.",
@@ -121,9 +131,12 @@ const en = {
 
   // Calibration
   calibration_title: "Calibration",
-  calibration_desc: "Answer these 8 questions to initialize your compass",
+  calibration_choose_desc: "Pick a questionnaire to begin. We'll start with a few key questions to map your compass.",
+  calibration_desc: "Answer these questions to initialize your compass",
   calibration_loading: "Loading calibration questions...",
   calibration_no_questions: "No questions found. Make sure the backend has seeded questions.",
+  political_compass_attribution: "Inspired by the classic two-axis political compass concept (Nolan 1969, Eysenck 1956). All questions are original.",
+  nine_axes_attribution: "Inspired by the 9Axes quiz (MIT License, based on 8values). All questions are original.",
 
   // Question card
   strongly_disagree: "Strongly Disagree",
@@ -132,6 +145,8 @@ const en = {
   agree: "Agree",
   disagree: "Disagree",
   submit: "Submit",
+  saving: "Saving...",
+  saved: "Saved ✓",
 
   // Accessibility
   font_size: "Text Size",
@@ -145,11 +160,32 @@ const en = {
   score_label: "Score",
   answers_label: "Answers",
 
+  // Political Compass axes & quadrants
+  axis_authoritarian: "Authoritarian",
+  axis_libertarian: "Libertarian",
+  axis_econ_left: "Left",
+  axis_econ_right: "Right",
+  quad_auth_left: "Authoritarian Left",
+  quad_auth_right: "Authoritarian Right",
+  quad_lib_left: "Libertarian Left",
+  quad_lib_right: "Libertarian Right",
+  show_id: "Show ID",
+  toggle_id: "Show your ID on the chart so others can find you",
+
   // Result card / share
   civic_compass: "Civic Compass",
   share_text: "My Civic Compass 🧭",
   share_discover: "Discover yours →",
   site_url: "civiccompass.app",
+
+  // Profile
+  profile_title: "Civic Profile",
+  profile_not_found: "This profile could not be found.",
+  back_to_dashboard: "Back to Dashboard",
+  share_profile: "Share Profile",
+  copy_id: "Copy ID",
+  joined: "Joined",
+  loading: "Loading",
 
   // Community / Matchmaking
   tab_community: "Community",
@@ -225,6 +261,18 @@ const en = {
   analytics_back: "Back to Dashboard",
   analytics_explore: "Explore Analytics",
 
+  // Poke
+  poke_user: "Poke",
+  poke_sent: "Poked",
+  poke_back: "Poke Back",
+  poke_mutual: "Mutual — you can now chat!",
+  pokes_title: "Pokes",
+  no_pokes: "No pokes yet",
+  poke_from: "poked you",
+  start_chat: "Start Chat",
+
+  unseen_pokes: "new pokes",
+
   // Welcome
   welcome_choose_lang: "Choose your language to get started",
   tap_switch_appearance: "Tap to switch appearance",
@@ -257,7 +305,7 @@ const fa: typeof en = {
 
   // Session
   session_ready_title: "آماده‌اید قطب‌نمایتان را بهتر کنید؟",
-  session_ready_desc: "به ۳ گزاره دیگر پاسخ دهید تا پروفایل مدنی‌تان عمیق‌تر شود.",
+  session_ready_desc: "یک پرسشنامه انتخاب کنید و به گزاره‌ها پاسخ دهید تا پروفایل مدنی‌تان شکل بگیرد.",
   start_session: "شروع جلسه",
   loading_questions: "بارگذاری سؤالات…",
   session_complete: "جلسه تمام شد!",
@@ -266,6 +314,14 @@ const fa: typeof en = {
   view_compass: "مشاهده قطب‌نما",
   another_round: "دور دیگر",
   question_of: "سؤال {current} از {total}",
+
+  // Questionnaires
+  questionnaire_choose: "یک پرسشنامه انتخاب کنید",
+  questionnaire_questions: "{count} سؤال",
+  questionnaire_progress: "پاسخ داده شده",
+  questionnaire_completed: "تکمیل شده",
+  questionnaire_start: "شروع",
+  questionnaire_continue: "ادامه",  questionnaire_retake: "شروع مجدد",  questionnaire_back: "همه پرسشنامه‌ها",
 
   // History / Timeline
   no_snapshots: "هنوز تصویری ذخیره نشده. اولین خود را از تب قطب\u200cنما ذخیره کنید.",
@@ -349,9 +405,12 @@ const fa: typeof en = {
 
   // Calibration
   calibration_title: "کالیبراسیون",
-  calibration_desc: "به این ۸ سؤال پاسخ دهید تا قطب‌نمایتان مقداردهی شود",
+  calibration_choose_desc: "یک پرسشنامه انتخاب کنید. با چند سؤال کلیدی قطب‌نمای شما ترسیم می‌شود.",
+  calibration_desc: "به این سؤالات پاسخ دهید تا قطب‌نمایتان مقداردهی شود",
   calibration_loading: "در حال بارگذاری سؤالات کالیبراسیون...",
   calibration_no_questions: "سؤالی یافت نشد. مطمئن شوید بک‌اند سؤالات را بارگذاری کرده است.",
+  political_compass_attribution: "الهام‌گرفته از مفهوم قطب‌نمای سیاسی دومحوره (نولان ۱۹۶۹، آیزنک ۱۹۵۶). تمام سؤالات اصیل هستند.",
+  nine_axes_attribution: "الهام‌گرفته از آزمون ۹ محور (مجوز MIT، بر پایه 8values). تمام سؤالات اصیل هستند.",
 
   // Question card
   strongly_disagree: "کاملاً مخالفم",
@@ -360,6 +419,8 @@ const fa: typeof en = {
   agree: "موافق",
   disagree: "مخالف",
   submit: "ثبت",
+  saving: "در حال ذخیره...",
+  saved: "ذخیره شد ✓",
 
   // Accessibility
   font_size: "اندازه متن",
@@ -373,11 +434,32 @@ const fa: typeof en = {
   score_label: "امتیاز",
   answers_label: "پاسخ‌ها",
 
+  // Political Compass axes & quadrants
+  axis_authoritarian: "اقتدارگرا",
+  axis_libertarian: "آزادی‌خواه",
+  axis_econ_left: "چپ",
+  axis_econ_right: "راست",
+  quad_auth_left: "اقتدارگرای چپ",
+  quad_auth_right: "اقتدارگرای راست",
+  quad_lib_left: "آزادی‌خواه چپ",
+  quad_lib_right: "آزادی‌خواه راست",
+  show_id: "نمایش شناسه",
+  toggle_id: "شناسه خود را روی نمودار نشان دهید تا دیگران شما را پیدا کنند",
+
   // Result card / share
   civic_compass: "قطب‌نمای مدنی",
   share_text: "قطب‌نمای مدنی من 🧭",
   share_discover: "قطب‌نمای خودت را کشف کن ←",
   site_url: "civiccompass.app",
+
+  // Profile
+  profile_title: "پروفایل مدنی",
+  profile_not_found: "این پروفایل یافت نشد.",
+  back_to_dashboard: "بازگشت به داشبورد",
+  share_profile: "اشتراک پروفایل",
+  copy_id: "کپی شناسه",
+  joined: "عضویت",
+  loading: "بارگذاری",
 
   // Community / Matchmaking
   tab_community: "جامعه",
@@ -452,6 +534,18 @@ const fa: typeof en = {
   analytics_monthly_trends: "روندهای ماهانه",
   analytics_back: "بازگشت به داشبورد",
   analytics_explore: "مشاهده تحلیل‌ها",
+
+  // Poke
+  poke_user: "سقلمه",
+  poke_sent: "ارسال شد",
+  poke_back: "سقلمه متقابل",
+  poke_mutual: "متقابل — حالا می‌توانید گفتگو کنید!",
+  pokes_title: "سقلمه‌ها",
+  no_pokes: "هنوز سقلمه‌ای نیست",
+  poke_from: "شما را سقلمه زد",
+  start_chat: "شروع گفتگو",
+
+  unseen_pokes: "سقلمه جدید",
 
   // Welcome
   welcome_choose_lang: "برای شروع زبان خود را انتخاب کنید",

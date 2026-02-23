@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { t, axisLabel } from "@/lib/i18n";
 import { questionsFa } from "@/lib/questions-fa";
+import { Loader2, CheckCircle } from "lucide-react";
 
 interface Question {
   id: string;
@@ -13,17 +14,28 @@ interface Question {
 
 interface QuestionCardProps {
   question: Question;
-  onAnswer: (questionId: string, value: number, responseTimeMs: number) => void;
+  onAnswer: (questionId: string, value: number, responseTimeMs: number) => void | Promise<void>;
 }
 
 export function QuestionCard({ question, onAnswer }: QuestionCardProps) {
   const [value, setValue] = useState(0);
   const [startTime] = useState(Date.now());
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const language = useAppStore((s) => s.language);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (saving) return;
     const responseTimeMs = Date.now() - startTime;
-    onAnswer(question.id, value, responseTimeMs);
+    setSaving(true);
+    try {
+      await onAnswer(question.id, value, responseTimeMs);
+      setSaved(true);
+    } catch {
+      // Parent handles the error
+    } finally {
+      setSaving(false);
+    }
   };
 
   const axes = Object.keys(question.weights);
@@ -71,9 +83,22 @@ export function QuestionCard({ question, onAnswer }: QuestionCardProps) {
 
         <button
           onClick={handleSubmit}
-          className="btn-primary w-full justify-center"
+          disabled={saving || saved}
+          className="btn-primary w-full justify-center disabled:opacity-70"
         >
-          {t("submit", language)}
+          {saving ? (
+            <>
+              <Loader2 size={16} strokeWidth={1.5} className="animate-spin" />
+              {t("saving", language)}
+            </>
+          ) : saved ? (
+            <>
+              <CheckCircle size={16} strokeWidth={1.5} />
+              {t("saved", language)}
+            </>
+          ) : (
+            t("submit", language)
+          )}
         </button>
       </div>
     </div>

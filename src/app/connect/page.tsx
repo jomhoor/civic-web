@@ -77,8 +77,9 @@ export default function ConnectPage() {
       const result = await verifySiwe(messageStr, signature);
       setAuth(result.user, result.token);
 
-      // 5. Navigate
-      router.push("/onboarding");
+      // 5. Navigate — skip onboarding for returning users
+      const hasOnboarded = useAppStore.getState().hasOnboarded;
+      router.push(hasOnboarded ? "/dashboard" : "/onboarding");
     } catch (err: unknown) {
       console.error("SIWE failed:", err);
       const msg = err instanceof Error ? err.message : "Connection failed";
