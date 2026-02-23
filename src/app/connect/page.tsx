@@ -104,7 +104,7 @@ export default function ConnectPage() {
 
         {statusMessage ? (
           <div className="flex flex-col items-center gap-3 py-4">
-            <Loader2 size={24} className="animate-spin" style={{ color: "var(--accent-primary)" }} />
+            <Loader2 size={24} strokeWidth={1.5} className="animate-spin" style={{ color: "var(--accent-primary)" }} />
             <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
               {statusMessage}
             </p>

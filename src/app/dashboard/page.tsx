@@ -23,7 +23,7 @@ import { Compass3D } from "@/components/compass-3d";
 import { CompassResultCard } from "@/components/compass-result-card";
 import { QuestionCard } from "@/components/question-card";
 import { SettingsBar } from "@/components/settings-bar";
-import { Share2, LogOut, GitCompare, Clock, Check, ArrowUpRight, ArrowDownRight, Minus, Users, Shield, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Share2, LogOut, GitCompare, Clock, Check, ArrowUpRight, ArrowDownRight, Minus, Users, Shield, Eye, EyeOff, Loader2, Scan, Swords, Puzzle } from "lucide-react";
 
 type Tab = "compass" | "session" | "history" | "community" | "wallet";
 
@@ -405,7 +405,7 @@ export default function DashboardPage() {
               className="btn-primary text-sm py-2 px-6 w-full sm:w-auto justify-center flex items-center gap-1.5"
             >
               {snapshotSaved ? (
-                <><Check size={14} /> {t("snapshot_saved", language)}</>
+                <><Check size={14} strokeWidth={1.5} /> {t("snapshot_saved", language)}</>
               ) : (
                 t("save_snapshot", language)
               )}
@@ -510,7 +510,7 @@ export default function DashboardPage() {
               {/* Compare toolbar */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <GitCompare size={16} style={{ color: "var(--accent-primary)" }} />
+                  <GitCompare size={16} strokeWidth={1.5} style={{ color: "var(--accent-primary)" }} />
                   <span className="text-sm font-medium">
                     {compareIds.length === 2
                       ? `${t("comparing", language)}…`
@@ -543,7 +543,7 @@ export default function DashboardPage() {
               {diffResult && (
                 <div className="card p-5 space-y-4" style={{ border: "1px solid var(--border-accent)" }}>
                   <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <GitCompare size={14} />
+                    <GitCompare size={14} strokeWidth={1.5} />
                     {t("diff_title", language)}
                   </h3>
 
@@ -594,7 +594,7 @@ export default function DashboardPage() {
                             <div className="absolute top-0 left-1/2 w-px h-full" style={{ background: "var(--border-color)" }} />
                           </div>
                           <span className="text-xs w-16 shrink-0 flex items-center gap-1" style={{ color: d.delta > 0 ? "var(--success)" : d.delta < 0 ? "var(--error)" : "var(--text-muted)" }}>
-                            {d.delta > 0 ? <ArrowUpRight size={10} /> : d.delta < 0 ? <ArrowDownRight size={10} /> : <Minus size={10} />}
+                            {d.delta > 0 ? <ArrowUpRight size={10} strokeWidth={1.5} /> : d.delta < 0 ? <ArrowDownRight size={10} strokeWidth={1.5} /> : <Minus size={10} strokeWidth={1.5} />}
                             {d.delta > 0 ? "+" : ""}{d.delta.toFixed(2)}
                           </span>
                         </div>
@@ -636,7 +636,7 @@ export default function DashboardPage() {
                           }}
                           title={isSelected ? "Deselect" : "Select for compare"}
                         >
-                          {isSelected && <Check size={10} color="#111" strokeWidth={3} />}
+                          {isSelected && <Check size={10} color="#111" strokeWidth={2.5} />}
                         </button>
 
                         {/* Snapshot card */}
@@ -651,7 +651,7 @@ export default function DashboardPage() {
                           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 mb-2">
                             <h3 className="font-medium text-sm">{s.snapshotName}</h3>
                             <div className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
-                              <Clock size={11} />
+                              <Clock size={11} strokeWidth={1.5} />
                               {new Date(s.createdAt).toLocaleDateString(undefined, {
                                 year: "numeric",
                                 month: "short",
@@ -741,7 +741,7 @@ export default function DashboardPage() {
           {/* Privacy settings card */}
           <div className="card p-5 space-y-4">
             <div className="flex items-center gap-2 mb-1">
-              <Shield size={16} style={{ color: "var(--accent-primary)" }} />
+              <Shield size={16} strokeWidth={1.5} style={{ color: "var(--accent-primary)" }} />
               <h3 className="text-sm font-semibold">{t("privacy_title", language)}</h3>
             </div>
 
@@ -752,9 +752,9 @@ export default function DashboardPage() {
               </p>
               <div className="grid grid-cols-3 gap-2">
                 {([
-                  { mode: "GHOST", icon: <EyeOff size={14} />, label: t("mode_ghost", language), desc: t("mode_ghost_desc", language) },
-                  { mode: "PUBLIC", icon: <Eye size={14} />, label: t("mode_public", language), desc: t("mode_public_desc", language) },
-                  { mode: "SELECTIVE", icon: <Users size={14} />, label: t("mode_selective", language), desc: t("mode_selective_desc", language) },
+                  { mode: "GHOST", icon: <EyeOff size={14} strokeWidth={1.5} />, label: t("mode_ghost", language), desc: t("mode_ghost_desc", language) },
+                  { mode: "PUBLIC", icon: <Eye size={14} strokeWidth={1.5} />, label: t("mode_public", language), desc: t("mode_public_desc", language) },
+                  { mode: "SELECTIVE", icon: <Users size={14} strokeWidth={1.5} />, label: t("mode_selective", language), desc: t("mode_selective_desc", language) },
                 ] as const).map((opt) => (
                   <button
                     key={opt.mode}
@@ -822,7 +822,7 @@ export default function DashboardPage() {
               className="btn-primary text-sm py-2 px-6 w-full justify-center flex items-center gap-1.5"
             >
               {settingsSaved ? (
-                <><Check size={14} /> {t("settings_saved", language)}</>
+                <><Check size={14} strokeWidth={1.5} /> {t("settings_saved", language)}</>
               ) : (
                 t("save_snapshot", language)
               )}
@@ -834,9 +834,9 @@ export default function DashboardPage() {
             <h3 className="text-sm font-semibold mb-3">{t("community_title", language)}</h3>
             <div className="grid grid-cols-3 gap-2 mb-4">
               {([
-                { mode: "mirror" as MatchMode, label: t("mode_mirror", language), desc: t("mode_mirror_desc", language), emoji: "🪞" },
-                { mode: "challenger" as MatchMode, label: t("mode_challenger", language), desc: t("mode_challenger_desc", language), emoji: "⚔️" },
-                { mode: "complement" as MatchMode, label: t("mode_complement", language), desc: t("mode_complement_desc", language), emoji: "🧩" },
+                { mode: "mirror" as MatchMode, label: t("mode_mirror", language), desc: t("mode_mirror_desc", language), icon: <Scan size={18} strokeWidth={1.5} /> },
+                { mode: "challenger" as MatchMode, label: t("mode_challenger", language), desc: t("mode_challenger_desc", language), icon: <Swords size={18} strokeWidth={1.5} /> },
+                { mode: "complement" as MatchMode, label: t("mode_complement", language), desc: t("mode_complement_desc", language), icon: <Puzzle size={18} strokeWidth={1.5} /> },
               ]).map((opt) => (
                 <button
                   key={opt.mode}
@@ -848,7 +848,7 @@ export default function DashboardPage() {
                     color: matchMode === opt.mode ? "#111" : "var(--text-secondary)",
                   }}
                 >
-                  <span className="text-lg">{opt.emoji}</span>
+                  {opt.icon}
                   <span className="text-xs font-semibold">{opt.label}</span>
                   <span className="text-[10px] leading-tight" style={{ color: matchMode === opt.mode ? "rgba(0,0,0,0.6)" : "var(--text-muted)" }}>
                     {opt.desc}
@@ -861,7 +861,7 @@ export default function DashboardPage() {
           {/* Match results */}
           {matchesLoading ? (
             <div className="flex items-center justify-center py-12 gap-2" style={{ color: "var(--text-secondary)" }}>
-              <Loader2 size={16} className="animate-spin" />
+              <Loader2 size={16} strokeWidth={1.5} className="animate-spin" />
               <span className="text-sm">{t("loading_matches", language)}</span>
             </div>
           ) : matches.length === 0 && matchMode ? (

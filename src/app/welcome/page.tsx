@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useAppStore, type Language, type FontSize } from "@/lib/store";
-import { Globe, ArrowRight, Sun, Moon, ALargeSmall } from "lucide-react";
+import { Globe, ArrowRight, Sun, Moon, ALargeSmall, Check } from "lucide-react";
 import { t } from "@/lib/i18n";
 
 const FONT_SIZES: { code: FontSize; label: string }[] = [
@@ -130,9 +130,7 @@ export default function WelcomePage() {
                     className="w-5 h-5 rounded-full flex items-center justify-center"
                     style={{ background: "var(--accent-gradient)" }}
                   >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
+                    <Check size={12} strokeWidth={2.5} color="#111" />
                   </div>
                 )}
               </button>
