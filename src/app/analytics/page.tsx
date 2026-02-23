@@ -449,8 +449,8 @@ export default function AnalyticsPage() {
                                 fontSize: 12,
                               }}
                               formatter={(
-                                _val: number,
-                                _name: string,
+                                _val: unknown,
+                                _name: unknown,
                                 props: { payload: { raw: string } }
                               ) => [props.payload.raw, "Score"]}
                             />

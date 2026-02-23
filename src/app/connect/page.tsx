@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { useAccount, useSignMessage, useDisconnect } from "wagmi";
+import { useAccount, useSignMessage, useDisconnect, useSwitchChain } from "wagmi";
+import { polygon } from "wagmi/chains";
 import { SiweMessage } from "siwe";
 import { getNonce, verifySiwe } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
@@ -19,8 +20,9 @@ export default function ConnectPage() {
   const { address, isConnected, chainId } = useAccount();
   const { signMessageAsync } = useSignMessage();
   const { disconnect } = useDisconnect();
+  const { switchChainAsync } = useSwitchChain();
 
-  const [status, setStatus] = useState<"idle" | "signing" | "verifying" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "signing" | "switching" | "verifying" | "error">("idle");
   const [error, setError] = useState("");
   const [siweAttempted, setSiweAttempted] = useState(false);
 
@@ -37,10 +39,19 @@ export default function ConnectPage() {
     if (siweAttempted) return; // prevent double-fire
     setSiweAttempted(true);
 
-    setStatus("signing");
     setError("");
 
     try {
+      // 0. Switch to Polygon if needed
+      let activeChainId = chainId;
+      if (chainId !== polygon.id) {
+        setStatus("switching");
+        await switchChainAsync({ chainId: polygon.id });
+        activeChainId = polygon.id;
+      }
+
+      setStatus("signing");
+
       // 1. Get nonce
       const { nonce } = await getNonce();
 
@@ -51,7 +62,7 @@ export default function ConnectPage() {
         statement: "Sign in to Civic Compass",
         uri: window.location.origin,
         version: "1",
-        chainId,
+        chainId: activeChainId,
         nonce,
       });
       const messageStr = siweMessage.prepareMessage();
@@ -86,7 +97,9 @@ export default function ConnectPage() {
     }
   }, [isConnected, address, status, handleSiwe]);
 
-  const statusMessage = status === "signing"
+  const statusMessage = status === "switching"
+    ? (language === "fa" ? "لطفاً به شبکه Polygon تغییر دهید..." : "Switching to Polygon network...")
+    : status === "signing"
     ? (language === "fa" ? "لطفاً پیام را در کیف پول امضا کنید..." : "Please sign the message in your wallet...")
     : status === "verifying"
     ? (language === "fa" ? "در حال تأیید..." : "Verifying...")
