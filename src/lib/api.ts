@@ -7,7 +7,39 @@ export const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// --- Auth ---
+/**
+ * Axios request interceptor — attaches the JWT from Zustand store
+ * to every outgoing request as `Authorization: Bearer <token>`.
+ */
+api.interceptors.request.use((config) => {
+  // Dynamic import-free access: read persisted Zustand state from localStorage
+  try {
+    const raw = localStorage.getItem("civic-compass-store");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const token = parsed?.state?.token;
+      if (token && !token.startsWith("mock-jwt-")) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return config;
+});
+
+// --- Auth (SIWE) ---
+export async function getNonce(): Promise<{ nonce: string }> {
+  const { data } = await api.get("/auth/nonce");
+  return data;
+}
+
+export async function verifySiwe(message: string, signature: string) {
+  const { data } = await api.post("/auth/verify", { message, signature });
+  return data;
+}
+
+/** @deprecated Use SIWE flow (getNonce + verifySiwe) instead */
 export async function walletAuth(walletAddress: string, isSmartWallet = false) {
   const { data } = await api.post("/auth/wallet", {
     walletAddress,
