@@ -25,64 +25,36 @@ export default function ConnectPage() {
   const [status, setStatus] = useState<"idle" | "signing" | "switching" | "verifying" | "error">("idle");
   const [error, setError] = useState("");
   const [siweAttempted, setSiweAttempted] = useState(false);
-  const [chainReady, setChainReady] = useState(false);
 
   /**
-   * Step 0 — As soon as the wallet connects, ensure we're on Polygon.
-   * This runs eagerly (before SIWE) so wagmi's internal state stays consistent.
-   */
-  useEffect(() => {
-    if (!isConnected || !address || !chainId) {
-      setChainReady(false);
-      return;
-    }
-
-    if (chainId === polygon.id) {
-      setChainReady(true);
-      return;
-    }
-
-    // Wrong chain — switch
-    let cancelled = false;
-    setStatus("switching");
-    switchChainAsync({ chainId: polygon.id })
-      .then(() => {
-        if (!cancelled) setChainReady(true);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        console.error("Chain switch failed:", err);
-        setError(
-          language === "fa"
-            ? "لطفاً شبکه کیف پول را به Polygon تغییر دهید."
-            : "Please switch your wallet to the Polygon network."
-        );
-        setStatus("error");
-        setSiweAttempted(false);
-        disconnect();
-      });
-
-    return () => { cancelled = true; };
-  }, [isConnected, address, chainId, switchChainAsync, disconnect, language]);
-
-  /**
-   * SIWE flow (runs only after chain is confirmed as Polygon):
-   * 1) Get nonce from backend
-   * 2) Build SIWE message
-   * 3) User signs in wallet
-   * 4) Backend verifies → JWT
-   * 5) Store & redirect
+   * Combined chain-switch + SIWE flow.
+   *
+   * useAccount().chainId reflects wagmi's *stored* connection chain, NOT the
+   * connector's actual current chain. So we ALWAYS call switchChainAsync
+   * first to force the wallet onto Polygon before signing.
    */
   const handleSiwe = useCallback(async () => {
     if (!address) return;
     if (siweAttempted) return;
     setSiweAttempted(true);
-
-    setStatus("signing");
     setError("");
 
     try {
+      // 0. Force-switch to Polygon — this is a no-op if already on 137,
+      //    but ensures the connector actually moves to the right chain.
+      setStatus("switching");
+      try {
+        await switchChainAsync({ chainId: polygon.id });
+      } catch (switchErr: unknown) {
+        const msg = switchErr instanceof Error ? switchErr.message : "";
+        // "already pending" or similar means it's fine
+        if (!msg.toLowerCase().includes("already") && !msg.toLowerCase().includes("same")) {
+          throw switchErr;
+        }
+      }
+
       // 1. Get nonce
+      setStatus("signing");
       const { nonce } = await getNonce();
 
       // 2. Build SIWE message
@@ -110,21 +82,29 @@ export default function ConnectPage() {
     } catch (err: unknown) {
       console.error("SIWE failed:", err);
       const msg = err instanceof Error ? err.message : "Connection failed";
-      setError(msg.includes("User rejected") || msg.includes("denied")
-        ? t("connect_error", language)
-        : msg);
+      if (msg.includes("ChainMismatch") || msg.includes("chain")) {
+        setError(
+          language === "fa"
+            ? "لطفاً شبکه کیف پول را به Polygon تغییر دهید و دوباره تلاش کنید."
+            : "Please switch your wallet to Polygon network and try again."
+        );
+      } else {
+        setError(msg.includes("User rejected") || msg.includes("denied")
+          ? t("connect_error", language)
+          : msg);
+      }
       setStatus("error");
       setSiweAttempted(false);
       disconnect();
     }
-  }, [address, signMessageAsync, setAuth, router, disconnect, language, siweAttempted]);
+  }, [address, switchChainAsync, signMessageAsync, setAuth, router, disconnect, language, siweAttempted]);
 
-  // When chain is confirmed and wallet is connected, auto-trigger SIWE
+  // When wallet connects, auto-trigger the flow
   useEffect(() => {
-    if (chainReady && isConnected && address && status !== "error" && status !== "signing" && status !== "verifying") {
+    if (isConnected && address && status === "idle") {
       handleSiwe();
     }
-  }, [chainReady, isConnected, address, status, handleSiwe]);
+  }, [isConnected, address, status, handleSiwe]);
 
   const statusMessage = status === "switching"
     ? (language === "fa" ? "لطفاً به شبکه Polygon تغییر دهید..." : "Switching to Polygon network...")
