@@ -8,34 +8,25 @@ import { wagmiConfig } from "@/lib/wagmi";
 import { useAppStore } from "@/lib/store";
 import { useState, useEffect, type ReactNode } from "react";
 import { polygon } from "wagmi/chains";
-import { reconnect, disconnect as disconnectCore } from "@wagmi/core";
 
 /**
- * Manual reconnect handler.
- *
- * wagmi's built-in reconnectOnMount throws ConnectorChainMismatchError
- * when the wallet is on a different chain (e.g. 7368) than the stored
- * connection chain (137 / Polygon). We disable the built-in reconnect
- * and handle it ourselves with proper error catching.
+ * On mount, purge any stale wagmi.* localStorage keys left over from
+ * before we switched to noopStorage.  This prevents
+ * ConnectorChainMismatchError during hydration.
  */
-function ReconnectHandler() {
+function WagmiCacheCleaner() {
   useEffect(() => {
-    reconnect(wagmiConfig).catch((err) => {
-      console.warn(
-        "[CivicCompass] Reconnect skipped — clearing stale session:",
-        err?.message ?? err,
+    try {
+      const keys = Object.keys(localStorage).filter(
+        (k) => k.startsWith("wagmi.") || k.startsWith("rk-")
       );
-      // Clean disconnect; if that fails, wipe wagmi localStorage keys
-      try {
-        disconnectCore(wagmiConfig);
-      } catch {
-        try {
-          Object.keys(localStorage)
-            .filter((k) => k.startsWith("wagmi."))
-            .forEach((k) => localStorage.removeItem(k));
-        } catch { /* SSR / incognito */ }
+      if (keys.length > 0) {
+        keys.forEach((k) => localStorage.removeItem(k));
+        console.info("[CivicCompass] Cleared stale wagmi/rk cache keys:", keys);
       }
-    });
+    } catch {
+      /* SSR / incognito — ignore */
+    }
   }, []);
   return null;
 }
@@ -71,7 +62,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <WagmiProvider config={wagmiConfig} reconnectOnMount={false}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider theme={rkTheme} locale="en" initialChain={polygon}>
-          <ReconnectHandler />
+          <WagmiCacheCleaner />
           {children}
         </RainbowKitProvider>
       </QueryClientProvider>
