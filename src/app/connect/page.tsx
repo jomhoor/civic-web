@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { useAccount, useSignMessage, useDisconnect, useSwitchChain } from "wagmi";
-import { polygon } from "wagmi/chains";
-import { SiweMessage } from "siwe";
 import { getNonce, verifySiwe } from "@/lib/api";
-import { useAppStore } from "@/lib/store";
-import { Wallet, Lock, Loader2 } from "lucide-react";
 import { t } from "@/lib/i18n";
+import { useAppStore } from "@/lib/store";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { Loader2, Lock, Wallet } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { SiweMessage } from "siwe";
+import { useAccount, useDisconnect, useSignMessage, useSwitchChain } from "wagmi";
+import { polygon } from "wagmi/chains";
 
 export default function ConnectPage() {
   const router = useRouter();

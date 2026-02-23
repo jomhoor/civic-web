@@ -1,9 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useAppStore, type Language, type FontSize } from "@/lib/store";
-import { Globe, ArrowRight, Sun, Moon, ALargeSmall, Check } from "lucide-react";
 import { t } from "@/lib/i18n";
+import { useAppStore, type FontSize, type Language } from "@/lib/store";
+import { ALargeSmall, ArrowRight, Check, Globe, Moon, Sun } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 const FONT_SIZES: { code: FontSize; label: string }[] = [
   { code: "normal", label: "A" },

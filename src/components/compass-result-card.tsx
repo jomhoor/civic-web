@@ -1,10 +1,10 @@
 "use client";
 
-import { useRef, useCallback } from "react";
-import { toPng } from "html-to-image";
 import { axisLabel, t } from "@/lib/i18n";
 import type { Language } from "@/lib/store";
-import { Download, Share2, Copy } from "lucide-react";
+import { toPng } from "html-to-image";
+import { Copy, Download, Share2 } from "lucide-react";
+import { useCallback, useRef } from "react";
 
 const AXIS_COLORS: Record<string, string> = {
   economy: "#0EBB90",

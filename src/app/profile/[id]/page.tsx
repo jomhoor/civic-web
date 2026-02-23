@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { getPublicProfile, sendPoke, getPokeStatus } from "@/lib/api";
-import { useAppStore } from "@/lib/store";
-import { t } from "@/lib/i18n";
-import { PoliticalCompassChart } from "@/components/political-compass-chart";
 import { PageNavBar } from "@/components/page-nav-bar";
+import { PoliticalCompassChart } from "@/components/political-compass-chart";
+import { getPokeStatus, getPublicProfile, sendPoke } from "@/lib/api";
+import { t } from "@/lib/i18n";
+import { useAppStore } from "@/lib/store";
 import { toPng } from "html-to-image";
-import { Download, Share2, ArrowLeft, Copy, Check, Zap, MessageCircle, ExternalLink } from "lucide-react";
+import { ArrowLeft, Check, Copy, Download, ExternalLink, MessageCircle, Share2, Zap } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface ProfileData {
   id: string;

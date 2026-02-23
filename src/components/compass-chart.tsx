@@ -1,17 +1,17 @@
 "use client";
 
+import { axisLabel, t } from "@/lib/i18n";
+import { useAppStore } from "@/lib/store";
 import { forwardRef } from "react";
 import {
-  Radar,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  ResponsiveContainer,
-  Tooltip,
+    PolarAngleAxis,
+    PolarGrid,
+    PolarRadiusAxis,
+    Radar,
+    RadarChart,
+    ResponsiveContainer,
+    Tooltip,
 } from "recharts";
-import { useAppStore } from "@/lib/store";
-import { axisLabel, t } from "@/lib/i18n";
 
 /** Republic-matched axis colours */
 const AXIS_COLORS: Record<string, string> = {

@@ -1,41 +1,41 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { useAppStore } from "@/lib/store";
-import { t, axisLabel, AXIS_KEYS } from "@/lib/i18n";
-import {
-  getCompass,
-  getHistory,
-  saveSnapshot,
-  getWallet,
-  getNextQuestions,
-  submitResponses,
-  diffSnapshots,
-  getFrequencyPreference,
-  setFrequencyPreference,
-  getMatches,
-  getMatchSettings,
-  updateMatchSettings,
-  sendConnectionRequest,
-  respondToConnection,
-  cancelConnection,
-  getIncomingRequests,
-  getConnections,
-  getQuestionnaireProgress,
-  resetQuestionnaireResponses,
-  getReceivedPokes,
-  markPokesSeen,
-  getUnseenPokeCount,
-  sendPoke,
-} from "@/lib/api";
-import { PoliticalCompassChart } from "@/components/political-compass-chart";
 import { Compass3D } from "@/components/compass-3d";
-import { toPng } from "html-to-image";
-import { QuestionCard } from "@/components/question-card";
 import { PageNavBar } from "@/components/page-nav-bar";
-import { Share2, GitCompare, Clock, Check, ArrowUpRight, ArrowDownRight, Minus, Users, Shield, Eye, EyeOff, Loader2, Scan, Swords, Puzzle, Link, MessageSquare, X, Send, UserPlus, ExternalLink, BarChart3, BookOpen, ArrowLeft, RotateCcw, CircleCheckBig, Download, Zap, MessageCircle } from "lucide-react";
+import { PoliticalCompassChart } from "@/components/political-compass-chart";
+import { QuestionCard } from "@/components/question-card";
 import { QuestionnaireIcon } from "@/components/questionnaire-icon";
+import {
+    cancelConnection,
+    diffSnapshots,
+    getCompass,
+    getConnections,
+    getFrequencyPreference,
+    getHistory,
+    getIncomingRequests,
+    getMatches,
+    getMatchSettings,
+    getNextQuestions,
+    getQuestionnaireProgress,
+    getReceivedPokes,
+    getUnseenPokeCount,
+    getWallet,
+    markPokesSeen,
+    resetQuestionnaireResponses,
+    respondToConnection,
+    saveSnapshot,
+    sendConnectionRequest,
+    sendPoke,
+    setFrequencyPreference,
+    submitResponses,
+    updateMatchSettings,
+} from "@/lib/api";
+import { AXIS_KEYS, axisLabel, t } from "@/lib/i18n";
+import { useAppStore } from "@/lib/store";
+import { toPng } from "html-to-image";
+import { ArrowDownRight, ArrowLeft, ArrowUpRight, BarChart3, BookOpen, Check, CircleCheckBig, Clock, Download, ExternalLink, Eye, EyeOff, GitCompare, Link, Loader2, MessageCircle, MessageSquare, Minus, Puzzle, RotateCcw, Scan, Share2, Shield, Swords, UserPlus, Users, X, Zap } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Tab = "compass" | "session" | "history" | "community" | "wallet";
 

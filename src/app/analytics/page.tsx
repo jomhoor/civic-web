@@ -1,45 +1,43 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { useAppStore } from "@/lib/store";
-import { t, axisLabel, AXIS_KEYS } from "@/lib/i18n";
-import {
-  getAnalyticsOverview,
-  getAnalyticsAggregate,
-  getAnalyticsDistribution,
-  getAnalyticsTrends,
-} from "@/lib/api";
-import {
-  Radar,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  ResponsiveContainer,
-  Tooltip,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  LineChart,
-  Line,
-  Legend,
-} from "recharts";
-import {
-  ArrowLeft,
-  Users,
-  Eye,
-  Camera,
-  MessageSquare,
-  Globe,
-  BarChart3,
-  TrendingUp,
-  Loader2,
-} from "lucide-react";
-import { SettingsBar } from "@/components/settings-bar";
 import { PageNavBar } from "@/components/page-nav-bar";
+import {
+    getAnalyticsAggregate,
+    getAnalyticsDistribution,
+    getAnalyticsOverview,
+    getAnalyticsTrends,
+} from "@/lib/api";
+import { AXIS_KEYS, axisLabel, t } from "@/lib/i18n";
+import { useAppStore } from "@/lib/store";
+import {
+    BarChart3,
+    Camera,
+    Eye,
+    Globe,
+    Loader2,
+    MessageSquare,
+    TrendingUp,
+    Users
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Legend,
+    Line,
+    LineChart,
+    PolarAngleAxis,
+    PolarGrid,
+    PolarRadiusAxis,
+    Radar,
+    RadarChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from "recharts";
 
 /* ── Axis colours (Republic palette) ── */
 const AXIS_COLORS: Record<string, string> = {

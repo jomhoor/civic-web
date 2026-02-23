@@ -1,11 +1,11 @@
 "use client";
 
+import { SettingsBar } from "@/components/settings-bar";
+import { t } from "@/lib/i18n";
+import { useAppStore } from "@/lib/store";
+import { LayoutDashboard, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useDisconnect } from "wagmi";
-import { useAppStore } from "@/lib/store";
-import { t } from "@/lib/i18n";
-import { LogOut, LayoutDashboard } from "lucide-react";
-import { SettingsBar } from "@/components/settings-bar";
 
 interface PageNavBarProps {
   /** Show the "Dashboard" / home button (default: true) */

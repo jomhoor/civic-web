@@ -1,8 +1,8 @@
 "use client";
 
-import { forwardRef } from "react";
-import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
+import { useAppStore } from "@/lib/store";
+import { forwardRef } from "react";
 
 interface PoliticalCompassChartProps {
   dimensions: Record<string, number>;

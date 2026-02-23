@@ -1,14 +1,14 @@
 "use client";
 
-import {
-  Compass,
-  Zap,
-  Monitor,
-  Map,
-  BarChart3,
-  HelpCircle,
-} from "lucide-react";
 import type { LucideProps } from "lucide-react";
+import {
+    BarChart3,
+    Compass,
+    HelpCircle,
+    Map,
+    Monitor,
+    Zap,
+} from "lucide-react";
 
 const iconMap: Record<string, React.ComponentType<LucideProps>> = {
   Compass,

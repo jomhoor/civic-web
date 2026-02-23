@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { useAppStore } from "@/lib/store";
-import { t, axisLabel } from "@/lib/i18n";
+import { axisLabel, t } from "@/lib/i18n";
 import { questionsFa } from "@/lib/questions-fa";
-import { Loader2, CheckCircle } from "lucide-react";
+import { useAppStore } from "@/lib/store";
+import { CheckCircle, Loader2 } from "lucide-react";
+import { useState } from "react";
 
 interface Question {
   id: string;

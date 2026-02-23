@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAppStore } from "@/lib/store";
-import { activateResearch } from "@/lib/api";
-import { ArrowRight } from "lucide-react";
-import { t } from "@/lib/i18n";
 import { PageNavBar } from "@/components/page-nav-bar";
+import { activateResearch } from "@/lib/api";
+import { t } from "@/lib/i18n";
+import { useAppStore } from "@/lib/store";
+import { ArrowRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export default function OnboardingPage() {
   const router = useRouter();

@@ -1,20 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  getCalibrationQuestions,
-  getQuestionnaireProgress,
-  submitResponses,
-  seedQuestions,
-  saveSnapshot,
-} from "@/lib/api";
-import { useAppStore } from "@/lib/store";
-import { QuestionCard } from "@/components/question-card";
-import { t } from "@/lib/i18n";
-import { BookOpen, ArrowLeft, ChevronRight, Check } from "lucide-react";
-import { QuestionnaireIcon } from "@/components/questionnaire-icon";
 import { PageNavBar } from "@/components/page-nav-bar";
+import { QuestionCard } from "@/components/question-card";
+import { QuestionnaireIcon } from "@/components/questionnaire-icon";
+import {
+    getCalibrationQuestions,
+    getQuestionnaireProgress,
+    saveSnapshot,
+    seedQuestions,
+    submitResponses,
+} from "@/lib/api";
+import { t } from "@/lib/i18n";
+import { useAppStore } from "@/lib/store";
+import { ArrowLeft, BookOpen, Check, ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 interface Question {
   id: string;
