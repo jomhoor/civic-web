@@ -39,8 +39,31 @@ const en = {
   another_round: "Another Round",
   question_of: "Question {current} of {total}",
 
-  // History
+  // History / Timeline
   no_snapshots: "No snapshots yet. Save your first one from the Compass tab.",
+  timeline: "Timeline",
+  compare: "Compare",
+  select_to_compare: "Select two snapshots to compare",
+  comparing: "Comparing",
+  vs: "vs",
+  clear_selection: "Clear",
+  diff_title: "Compass Diff",
+  total_shift: "Total Shift",
+  biggest_shift: "Biggest Shift",
+  no_change: "No significant changes",
+  from_label: "From",
+  to_label: "To",
+  delta_label: "Delta",
+  snapshot_saved: "Snapshot saved!",
+  auto_snapshot: "Auto-save after session",
+
+  // Frequency
+  frequency_title: "Reflection Frequency",
+  frequency_desc: "How often do you want to be reminded?",
+  freq_daily: "Daily",
+  freq_weekly: "Weekly",
+  freq_monthly: "Monthly",
+  freq_saved: "Preference saved",
 
   // Wallet
   civic_tokens: "$CIVIC tokens",
@@ -170,8 +193,31 @@ const fa: typeof en = {
   another_round: "دور دیگر",
   question_of: "سؤال {current} از {total}",
 
-  // History
-  no_snapshots: "هنوز تصویری ذخیره نشده. اولین خود را از تب قطب‌نما ذخیره کنید.",
+  // History / Timeline
+  no_snapshots: "هنوز تصویری ذخیره نشده. اولین خود را از تب قطب\u200cنما ذخیره کنید.",
+  timeline: "خط زمانی",
+  compare: "مقایسه",
+  select_to_compare: "دو تصویر را برای مقایسه انتخاب کنید",
+  comparing: "مقایسه",
+  vs: "در برابر",
+  clear_selection: "پاک کردن",
+  diff_title: "تفاوت قطب\u200cنما",
+  total_shift: "تغییر کل",
+  biggest_shift: "بزرگ\u200cترین تغییر",
+  no_change: "تغییر قابل توجهی نیست",
+  from_label: "از",
+  to_label: "به",
+  delta_label: "تفاوت",
+  snapshot_saved: "تصویر ذخیره شد!",
+  auto_snapshot: "ذخیره خودکار پس از جلسه",
+
+  // Frequency
+  frequency_title: "تناوب تأمل",
+  frequency_desc: "هر چند وقت یکبار می\u200cخواهید یادآوری شوید؟",
+  freq_daily: "روزانه",
+  freq_weekly: "هفتگی",
+  freq_monthly: "ماهانه",
+  freq_saved: "ترجیح ذخیره شد",
 
   // Wallet
   civic_tokens: "توکن $CIVIC",

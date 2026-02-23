@@ -99,6 +99,26 @@ export async function getHistory(userId: string) {
   return data;
 }
 
+export async function getSnapshot(snapshotId: string) {
+  const { data } = await api.get(`/compass/snapshot/${snapshotId}`);
+  return data;
+}
+
+export async function diffSnapshots(id1: string, id2: string) {
+  const { data } = await api.get("/compass/diff", { params: { id1, id2 } });
+  return data;
+}
+
+export async function getFrequencyPreference() {
+  const { data } = await api.get("/compass/frequency");
+  return data;
+}
+
+export async function setFrequencyPreference(frequency: string) {
+  const { data } = await api.post("/compass/frequency", { frequency });
+  return data;
+}
+
 // --- Wallet ---
 export async function getWallet(userId: string) {
   const { data } = await api.get("/wallet", { params: { userId } });

@@ -27,9 +27,11 @@ const AXIS_COLORS: Record<string, string> = {
 interface CompassChartProps {
   dimensions: Record<string, number>;
   confidence: Record<string, number>;
+  /** Optional second dataset to overlay (for diff comparison). Rendered as dashed outline. */
+  overlayDimensions?: Record<string, number>;
 }
 
-export function CompassChart({ dimensions, confidence }: CompassChartProps) {
+export function CompassChart({ dimensions, confidence, overlayDimensions }: CompassChartProps) {
   const language = useAppStore((s) => s.language);
   const theme = useAppStore((s) => s.theme);
 
@@ -40,6 +42,12 @@ export function CompassChart({ dimensions, confidence }: CompassChartProps) {
     value: (value + 1) / 2,
     rawValue: value.toFixed(2),
     confidence: confidence[axis] ?? 0,
+    ...(overlayDimensions
+      ? {
+          overlay: ((overlayDimensions[axis] ?? 0) + 1) / 2,
+          overlayRaw: (overlayDimensions[axis] ?? 0).toFixed(2),
+        }
+      : {}),
   }));
 
   const gridColor = theme === "light" ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)";
@@ -84,6 +92,16 @@ export function CompassChart({ dimensions, confidence }: CompassChartProps) {
             fillOpacity={0.35}
             strokeWidth={2}
           />
+          {overlayDimensions && (
+            <Radar
+              name="Previous"
+              dataKey="overlay"
+              stroke="var(--text-muted)"
+              fill="none"
+              strokeWidth={1.5}
+              strokeDasharray="4 4"
+            />
+          )}
           <defs>
             <linearGradient id="compassGradient" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stopColor="#5B9DF5" />

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
-import { t, axisLabel } from "@/lib/i18n";
+import { t, axisLabel, AXIS_KEYS } from "@/lib/i18n";
 import {
   getCompass,
   getHistory,
@@ -11,13 +11,16 @@ import {
   getWallet,
   getNextQuestions,
   submitResponses,
+  diffSnapshots,
+  getFrequencyPreference,
+  setFrequencyPreference,
 } from "@/lib/api";
 import { CompassChart } from "@/components/compass-chart";
 import { Compass3D } from "@/components/compass-3d";
 import { CompassResultCard } from "@/components/compass-result-card";
 import { QuestionCard } from "@/components/question-card";
 import { SettingsBar } from "@/components/settings-bar";
-import { Share2, LogOut } from "lucide-react";
+import { Share2, LogOut, GitCompare, Clock, Check, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 
 type Tab = "compass" | "session" | "history" | "wallet";
 
@@ -26,7 +29,15 @@ interface Snapshot {
   snapshotName: string;
   dimensions: Record<string, number>;
   confidence: Record<string, number>;
+  changeLog: string | null;
   createdAt: string;
+}
+
+interface DiffResult {
+  from: { id: string; snapshotName: string; createdAt: string; dimensions: Record<string, number> };
+  to: { id: string; snapshotName: string; createdAt: string; dimensions: Record<string, number> };
+  deltas: Record<string, { from: number; to: number; delta: number }>;
+  summary: { totalShift: number; biggestShift: { axis: string; label: string; delta: number }; changeLog: string };
 }
 
 interface WalletData {
@@ -56,6 +67,15 @@ export default function DashboardPage() {
   const [history, setHistory] = useState<Snapshot[]>([]);
   const [wallet, setWallet] = useState<WalletData | null>(null);
   const [snapshotName, setSnapshotName] = useState("");
+  const [snapshotSaved, setSnapshotSaved] = useState(false);
+
+  // Compare state
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [diffResult, setDiffResult] = useState<DiffResult | null>(null);
+  const [diffLoading, setDiffLoading] = useState(false);
+
+  // Frequency state
+  const [frequency, setFrequency] = useState<string>("WEEKLY");
 
   // Session state
   const [sessionQuestions, setSessionQuestions] = useState<Question[]>([]);
@@ -71,14 +91,18 @@ export default function DashboardPage() {
 
     async function load() {
       try {
-        const [compassData, historyData, walletData] = await Promise.all([
+        const [compassData, historyData, walletData, freqData] = await Promise.all([
           getCompass(user!.id),
           getHistory(user!.id),
-          getWallet(user!.id),
+          getWallet(user!.id).catch(() => null),
+          getFrequencyPreference().catch(() => null),
         ]);
         setCompass(compassData);
         setHistory(historyData);
         setWallet(walletData);
+        if (freqData?.frequencyPreference) {
+          setFrequency(freqData.frequencyPreference);
+        }
       } catch (err) {
         console.error("Failed to load dashboard data:", err);
       }
@@ -94,8 +118,44 @@ export default function DashboardPage() {
       const updatedHistory = await getHistory(user.id);
       setHistory(updatedHistory);
       setSnapshotName("");
+      setSnapshotSaved(true);
+      setTimeout(() => setSnapshotSaved(false), 2000);
     } catch (err) {
       console.error("Failed to save snapshot:", err);
+    }
+  }
+
+  // Toggle snapshot selection for compare
+  function toggleCompareId(id: string) {
+    setCompareIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= 2) return [prev[1], id]; // replace oldest
+      return [...prev, id];
+    });
+    setDiffResult(null);
+  }
+
+  // Run diff when two snapshots are selected
+  async function runDiff() {
+    if (compareIds.length !== 2) return;
+    setDiffLoading(true);
+    try {
+      const result = await diffSnapshots(compareIds[0], compareIds[1]);
+      setDiffResult(result);
+    } catch (err) {
+      console.error("Failed to diff:", err);
+    } finally {
+      setDiffLoading(false);
+    }
+  }
+
+  // Save frequency preference
+  async function handleFrequencyChange(freq: string) {
+    setFrequency(freq);
+    try {
+      await setFrequencyPreference(freq);
+    } catch (err) {
+      console.error("Failed to save frequency:", err);
     }
   }
 
@@ -129,9 +189,16 @@ export default function DashboardPage() {
         setSessionIndex((i) => i + 1);
       } else {
         setSessionDone(true);
-        // Refresh compass after session
+        // Refresh compass after session and auto-save snapshot
         const compassData = await getCompass(user.id);
         setCompass(compassData);
+        try {
+          await saveSnapshot(user.id, `Session ${new Date().toISOString().split('T')[0]}`);
+          const updatedHistory = await getHistory(user.id);
+          setHistory(updatedHistory);
+        } catch {
+          // Non-critical — just skip auto-snapshot
+        }
       }
     } catch (err) {
       console.error("Failed to submit session response:", err);
@@ -273,9 +340,13 @@ export default function DashboardPage() {
             />
             <button
               onClick={handleSaveSnapshot}
-              className="btn-primary text-sm py-2 px-6 w-full sm:w-auto justify-center"
+              className="btn-primary text-sm py-2 px-6 w-full sm:w-auto justify-center flex items-center gap-1.5"
             >
-              {t("save_snapshot", language)}
+              {snapshotSaved ? (
+                <><Check size={14} /> {t("snapshot_saved", language)}</>
+              ) : (
+                t("save_snapshot", language)
+              )}
             </button>
           </div>
         </div>
@@ -365,54 +436,239 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* History tab */}
+      {/* History tab — Timeline + Compare */}
       {tab === "history" && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {history.length === 0 ? (
             <p className="text-center py-12" style={{ color: "var(--text-muted)" }}>
               {t("no_snapshots", language)}
             </p>
           ) : (
-            history.map((s) => (
-              <div key={s.id} className="card p-4">
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="font-medium">{s.snapshotName}</h3>
-                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                    {new Date(s.createdAt).toLocaleDateString()}
+            <>
+              {/* Compare toolbar */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <GitCompare size={16} style={{ color: "var(--accent-primary)" }} />
+                  <span className="text-sm font-medium">
+                    {compareIds.length === 2
+                      ? `${t("comparing", language)}…`
+                      : t("select_to_compare", language)}
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {Object.entries(s.dimensions).map(([axis, val]) => (
-                    <span
-                      key={axis}
-                      className="tag text-xs"
+                <div className="flex gap-2">
+                  {compareIds.length > 0 && (
+                    <button
+                      onClick={() => { setCompareIds([]); setDiffResult(null); }}
+                      className="btn-outline text-xs py-1.5 px-3"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      {t("clear_selection", language)}
+                    </button>
+                  )}
+                  {compareIds.length === 2 && (
+                    <button
+                      onClick={runDiff}
+                      className="btn-primary text-xs py-1.5 px-4"
+                      disabled={diffLoading}
+                    >
+                      {diffLoading ? "…" : t("compare", language)}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Diff result card */}
+              {diffResult && (
+                <div className="card p-5 space-y-4" style={{ border: "1px solid var(--border-accent)" }}>
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <GitCompare size={14} />
+                    {t("diff_title", language)}
+                  </h3>
+
+                  {/* Summary */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl p-3" style={{ background: "var(--component-primary)" }}>
+                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>{t("total_shift", language)}</p>
+                      <p className="text-lg font-bold text-gradient">{diffResult.summary.totalShift.toFixed(2)}</p>
+                    </div>
+                    <div className="rounded-xl p-3" style={{ background: "var(--component-primary)" }}>
+                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>{t("biggest_shift", language)}</p>
+                      <p className="text-lg font-bold" style={{ color: diffResult.summary.biggestShift.delta > 0 ? "var(--success)" : "var(--error)" }}>
+                        {axisLabel(diffResult.summary.biggestShift.axis, language)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Snapshot labels */}
+                  <div className="flex items-center justify-between text-xs" style={{ color: "var(--text-muted)" }}>
+                    <span>{diffResult.from.snapshotName} ({new Date(diffResult.from.createdAt).toLocaleDateString()})</span>
+                    <span>→</span>
+                    <span>{diffResult.to.snapshotName} ({new Date(diffResult.to.createdAt).toLocaleDateString()})</span>
+                  </div>
+
+                  {/* Per-axis delta bars */}
+                  <div className="space-y-2">
+                    {AXIS_KEYS.map((axis) => {
+                      const d = diffResult.deltas[axis];
+                      if (!d) return null;
+                      const absDelta = Math.abs(d.delta);
+                      const barWidth = Math.min(absDelta * 100, 100);
+                      return (
+                        <div key={axis} className="flex items-center gap-3">
+                          <span className="text-xs w-24 shrink-0 text-end" style={{ color: "var(--text-secondary)" }}>
+                            {axisLabel(axis, language)}
+                          </span>
+                          <div className="flex-1 h-4 rounded-full relative overflow-hidden" style={{ background: "var(--component-primary)" }}>
+                            <div
+                              className="absolute top-0 h-full rounded-full transition-all"
+                              style={{
+                                width: `${barWidth}%`,
+                                left: d.delta >= 0 ? "50%" : `${50 - barWidth}%`,
+                                background: d.delta > 0 ? "var(--success)" : d.delta < 0 ? "var(--error)" : "var(--text-muted)",
+                                opacity: 0.7,
+                              }}
+                            />
+                            {/* center line */}
+                            <div className="absolute top-0 left-1/2 w-px h-full" style={{ background: "var(--border-color)" }} />
+                          </div>
+                          <span className="text-xs w-16 shrink-0 flex items-center gap-1" style={{ color: d.delta > 0 ? "var(--success)" : d.delta < 0 ? "var(--error)" : "var(--text-muted)" }}>
+                            {d.delta > 0 ? <ArrowUpRight size={10} /> : d.delta < 0 ? <ArrowDownRight size={10} /> : <Minus size={10} />}
+                            {d.delta > 0 ? "+" : ""}{d.delta.toFixed(2)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Overlay comparison chart */}
+                  <div className="mt-4">
+                    <CompassChart
+                      dimensions={diffResult.to.dimensions}
+                      confidence={{}}
+                      overlayDimensions={diffResult.from.dimensions}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Timeline */}
+              <div className="relative">
+                {/* Timeline line */}
+                <div
+                  className="absolute top-0 bottom-0 start-4 w-px"
+                  style={{ background: "var(--border-color)" }}
+                />
+
+                <div className="space-y-4">
+                  {history.map((s, i) => {
+                    const isSelected = compareIds.includes(s.id);
+                    return (
+                      <div key={s.id} className="relative flex gap-4 ps-10">
+                        {/* Timeline dot */}
+                        <button
+                          onClick={() => toggleCompareId(s.id)}
+                          className="absolute start-2 top-4 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all z-10 shrink-0"
+                          style={{
+                            borderColor: isSelected ? "var(--accent-primary)" : "var(--border-color)",
+                            background: isSelected ? "var(--accent-primary)" : "var(--bg-primary)",
+                          }}
+                          title={isSelected ? "Deselect" : "Select for compare"}
+                        >
+                          {isSelected && <Check size={10} color="#111" strokeWidth={3} />}
+                        </button>
+
+                        {/* Snapshot card */}
+                        <div
+                          className="card p-4 flex-1 transition-all cursor-pointer"
+                          onClick={() => toggleCompareId(s.id)}
+                          style={{
+                            border: isSelected ? "1px solid var(--accent-primary)" : undefined,
+                            boxShadow: isSelected ? "0 0 0 1px var(--accent-primary)" : undefined,
+                          }}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 mb-2">
+                            <h3 className="font-medium text-sm">{s.snapshotName}</h3>
+                            <div className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
+                              <Clock size={11} />
+                              {new Date(s.createdAt).toLocaleDateString(undefined, {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Changelog */}
+                          {s.changeLog && (
+                            <p className="text-xs mb-3" style={{ color: "var(--text-secondary)" }}>
+                              {s.changeLog}
+                            </p>
+                          )}
+
+                          {/* Axis tags */}
+                          <div className="flex flex-wrap gap-1.5">
+                            {Object.entries(s.dimensions).map(([axis, val]) => (
+                              <span
+                                key={axis}
+                                className="tag text-xs"
+                                style={{
+                                  background:
+                                    (val as number) > 0
+                                      ? "rgba(14, 187, 144, 0.1)"
+                                      : (val as number) < 0
+                                        ? "rgba(224, 81, 77, 0.1)"
+                                        : "var(--component-primary)",
+                                  borderColor:
+                                    (val as number) > 0
+                                      ? "rgba(14, 187, 144, 0.3)"
+                                      : (val as number) < 0
+                                        ? "rgba(224, 81, 77, 0.3)"
+                                        : "var(--border-color)",
+                                  color:
+                                    (val as number) > 0
+                                      ? "var(--success)"
+                                      : (val as number) < 0
+                                        ? "var(--error)"
+                                        : "var(--text-muted)",
+                                }}
+                              >
+                                {axisLabel(axis, language)}: {(val as number).toFixed(2)}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Frequency preference */}
+              <div className="card p-4 space-y-3">
+                <h3 className="text-sm font-medium">{t("frequency_title", language)}</h3>
+                <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                  {t("frequency_desc", language)}
+                </p>
+                <div className="flex gap-2">
+                  {(["DAILY", "WEEKLY", "MONTHLY"] as const).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => handleFrequencyChange(f)}
+                      className="flex-1 py-2 rounded-lg text-xs font-medium transition-all"
                       style={{
-                        background:
-                          (val as number) > 0
-                            ? "rgba(14, 187, 144, 0.1)"
-                            : (val as number) < 0
-                              ? "rgba(224, 81, 77, 0.1)"
-                              : "var(--component-primary)",
-                        borderColor:
-                          (val as number) > 0
-                            ? "rgba(14, 187, 144, 0.3)"
-                            : (val as number) < 0
-                              ? "rgba(224, 81, 77, 0.3)"
-                              : "var(--border-color)",
-                        color:
-                          (val as number) > 0
-                            ? "var(--success)"
-                            : (val as number) < 0
-                              ? "var(--error)"
-                              : "var(--text-muted)",
+                        background: frequency === f ? "var(--accent-gradient)" : "var(--component-primary)",
+                        color: frequency === f ? "#111" : "var(--text-secondary)",
+                        border: `1px solid ${frequency === f ? "transparent" : "var(--border-color)"}`,
                       }}
                     >
-                      {axisLabel(axis, language)}: {(val as number).toFixed(2)}
-                    </span>
+                      {t(`freq_${f.toLowerCase()}` as "freq_daily" | "freq_weekly" | "freq_monthly", language)}
+                    </button>
                   ))}
                 </div>
               </div>
-            ))
+            </>
           )}
         </div>
       )}
