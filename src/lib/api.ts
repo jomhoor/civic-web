@@ -184,3 +184,30 @@ export async function getTransactions(userId: string) {
   });
   return data;
 }
+
+// --- Public Analytics (no auth required) ---
+export async function getAnalyticsOverview() {
+  const { data } = await api.get("/analytics/overview");
+  return data;
+}
+
+export async function getAnalyticsAggregate(country?: string) {
+  const { data } = await api.get("/analytics/aggregate", {
+    params: country ? { country } : {},
+  });
+  return data;
+}
+
+export async function getAnalyticsDistribution(country?: string) {
+  const { data } = await api.get("/analytics/distribution", {
+    params: country ? { country } : {},
+  });
+  return data;
+}
+
+export async function getAnalyticsTrends(months = 12, country?: string) {
+  const { data } = await api.get("/analytics/trends", {
+    params: { months, ...(country ? { country } : {}) },
+  });
+  return data;
+}

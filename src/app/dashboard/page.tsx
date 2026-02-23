@@ -28,7 +28,7 @@ import { Compass3D } from "@/components/compass-3d";
 import { CompassResultCard } from "@/components/compass-result-card";
 import { QuestionCard } from "@/components/question-card";
 import { SettingsBar } from "@/components/settings-bar";
-import { Share2, LogOut, GitCompare, Clock, Check, ArrowUpRight, ArrowDownRight, Minus, Users, Shield, Eye, EyeOff, Loader2, Scan, Swords, Puzzle, Link, MessageSquare, X, Send, UserPlus, ExternalLink } from "lucide-react";
+import { Share2, LogOut, GitCompare, Clock, Check, ArrowUpRight, ArrowDownRight, Minus, Users, Shield, Eye, EyeOff, Loader2, Scan, Swords, Puzzle, Link, MessageSquare, X, Send, UserPlus, ExternalLink, BarChart3 } from "lucide-react";
 
 type Tab = "compass" | "session" | "history" | "community" | "wallet";
 
@@ -1271,6 +1271,18 @@ export default function DashboardPage() {
           )}
         </div>
       )}
+
+      {/* Public Analytics link */}
+      <div className="mt-8 text-center">
+        <button
+          onClick={() => router.push("/analytics")}
+          className="btn-outline text-sm py-2 px-6 inline-flex items-center gap-2"
+          style={{ color: "var(--text-muted)" }}
+        >
+          <BarChart3 size={14} strokeWidth={1.5} />
+          {t("analytics_explore", language)}
+        </button>
+      </div>
     </main>
   );
 }
