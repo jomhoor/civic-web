@@ -141,6 +141,37 @@ export async function updateMatchSettings(settings: {
   return data;
 }
 
+// --- Connection Requests ---
+export async function sendConnectionRequest(body: {
+  receiverId: string;
+  matchMode: string;
+  matchScore: number;
+  message?: string;
+}) {
+  const { data } = await api.post("/matches/connect", body);
+  return data;
+}
+
+export async function respondToConnection(connectionId: string, action: "ACCEPTED" | "DECLINED") {
+  const { data } = await api.post(`/matches/connect/${connectionId}/respond`, { action });
+  return data;
+}
+
+export async function cancelConnection(connectionId: string) {
+  const { data } = await api.post(`/matches/connect/${connectionId}/cancel`);
+  return data;
+}
+
+export async function getIncomingRequests() {
+  const { data } = await api.get("/matches/incoming");
+  return data;
+}
+
+export async function getConnections() {
+  const { data } = await api.get("/matches/connections");
+  return data;
+}
+
 // --- Wallet ---
 export async function getWallet(userId: string) {
   const { data } = await api.get("/wallet", { params: { userId } });

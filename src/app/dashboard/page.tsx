@@ -17,13 +17,18 @@ import {
   getMatches,
   getMatchSettings,
   updateMatchSettings,
+  sendConnectionRequest,
+  respondToConnection,
+  cancelConnection,
+  getIncomingRequests,
+  getConnections,
 } from "@/lib/api";
 import { CompassChart } from "@/components/compass-chart";
 import { Compass3D } from "@/components/compass-3d";
 import { CompassResultCard } from "@/components/compass-result-card";
 import { QuestionCard } from "@/components/question-card";
 import { SettingsBar } from "@/components/settings-bar";
-import { Share2, LogOut, GitCompare, Clock, Check, ArrowUpRight, ArrowDownRight, Minus, Users, Shield, Eye, EyeOff, Loader2, Scan, Swords, Puzzle } from "lucide-react";
+import { Share2, LogOut, GitCompare, Clock, Check, ArrowUpRight, ArrowDownRight, Minus, Users, Shield, Eye, EyeOff, Loader2, Scan, Swords, Puzzle, Link, MessageSquare, X, Send, UserPlus, ExternalLink } from "lucide-react";
 
 type Tab = "compass" | "session" | "history" | "community" | "wallet";
 
@@ -63,6 +68,33 @@ interface MatchResult {
   dimensions: Record<string, number>;
   score: number;
   mode: string;
+  connectionStatus?: string | null;
+  connectionId?: string | null;
+  connectionDirection?: "sent" | "received" | null;
+}
+
+interface IncomingRequest {
+  id: string;
+  matchMode: string;
+  matchScore: number;
+  message: string | null;
+  createdAt: string;
+  sender: {
+    id: string;
+    displayName: string | null;
+    walletAddress: string;
+  };
+}
+
+interface Connection {
+  connectionId: string;
+  userId: string;
+  displayName: string | null;
+  walletAddress: string;
+  matchMode: string;
+  matchScore: number;
+  connectedAt: string;
+  blockscanChatUrl: string;
 }
 
 type MatchMode = "mirror" | "challenger" | "complement";
@@ -103,6 +135,13 @@ export default function DashboardPage() {
   const [matchThreshold, setMatchThreshold] = useState(0.8);
   const [settingsSaved, setSettingsSaved] = useState(false);
 
+  // Connection state
+  const [incomingRequests, setIncomingRequests] = useState<IncomingRequest[]>([]);
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [connectingTo, setConnectingTo] = useState<string | null>(null); // userId being connected to
+  const [connectMessage, setConnectMessage] = useState("");
+  const [respondingTo, setRespondingTo] = useState<string | null>(null); // connectionId being responded to
+
   // Session state
   const [sessionQuestions, setSessionQuestions] = useState<Question[]>([]);
   const [sessionIndex, setSessionIndex] = useState(0);
@@ -117,12 +156,14 @@ export default function DashboardPage() {
 
     async function load() {
       try {
-        const [compassData, historyData, walletData, freqData, matchSettingsData] = await Promise.all([
+        const [compassData, historyData, walletData, freqData, matchSettingsData, incomingData, connectionsData] = await Promise.all([
           getCompass(user!.id),
           getHistory(user!.id),
           getWallet(user!.id).catch(() => null),
           getFrequencyPreference().catch(() => null),
           getMatchSettings().catch(() => null),
+          getIncomingRequests().catch(() => []),
+          getConnections().catch(() => []),
         ]);
         setCompass(compassData);
         setHistory(historyData);
@@ -135,6 +176,8 @@ export default function DashboardPage() {
           setDisplayName(matchSettingsData.displayName ?? "");
           setMatchThreshold(matchSettingsData.matchThreshold ?? 0.8);
         }
+        setIncomingRequests(incomingData ?? []);
+        setConnections(connectionsData ?? []);
       } catch (err) {
         console.error("Failed to load dashboard data:", err);
       }
@@ -217,6 +260,64 @@ export default function DashboardPage() {
       setTimeout(() => setSettingsSaved(false), 2000);
     } catch (err) {
       console.error("Failed to save settings:", err);
+    }
+  }
+
+  // Send a connection request
+  async function handleConnect(userId: string, matchMode: string, matchScore: number) {
+    setConnectingTo(userId);
+    try {
+      await sendConnectionRequest({
+        receiverId: userId,
+        matchMode,
+        matchScore,
+        message: connectMessage || undefined,
+      });
+      setConnectMessage("");
+      // Refresh matches to update connection status
+      await loadMatches(matchMode as MatchMode);
+      // Also refresh incoming requests in case of auto-accept
+      const [inc, conns] = await Promise.all([
+        getIncomingRequests().catch(() => []),
+        getConnections().catch(() => []),
+      ]);
+      setIncomingRequests(inc ?? []);
+      setConnections(conns ?? []);
+    } catch (err) {
+      console.error("Failed to send connection request:", err);
+    } finally {
+      setConnectingTo(null);
+    }
+  }
+
+  // Accept or decline a connection request
+  async function handleRespond(connectionId: string, action: "ACCEPTED" | "DECLINED") {
+    setRespondingTo(connectionId);
+    try {
+      await respondToConnection(connectionId, action);
+      // Refresh
+      const [inc, conns] = await Promise.all([
+        getIncomingRequests().catch(() => []),
+        getConnections().catch(() => []),
+      ]);
+      setIncomingRequests(inc ?? []);
+      setConnections(conns ?? []);
+      // Refresh matches too
+      if (matchMode) await loadMatches(matchMode);
+    } catch (err) {
+      console.error("Failed to respond to connection:", err);
+    } finally {
+      setRespondingTo(null);
+    }
+  }
+
+  // Cancel a pending request
+  async function handleCancelConnection(connectionId: string) {
+    try {
+      await cancelConnection(connectionId);
+      if (matchMode) await loadMatches(matchMode);
+    } catch (err) {
+      console.error("Failed to cancel connection:", err);
     }
   }
 
@@ -883,16 +984,18 @@ export default function DashboardPage() {
                     className="w-full p-4 flex items-center justify-between text-start"
                   >
                     <div className="flex items-center gap-3">
-                      {/* Avatar placeholder */}
                       <div
                         className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold"
                         style={{
-                          background: "var(--accent-gradient-soft)",
-                          color: "var(--accent-primary)",
-                          border: "1px solid var(--border-accent)",
+                          background: m.connectionStatus === "ACCEPTED" ? "var(--success)" : "var(--accent-gradient-soft)",
+                          color: m.connectionStatus === "ACCEPTED" ? "#fff" : "var(--accent-primary)",
+                          border: `1px solid ${m.connectionStatus === "ACCEPTED" ? "var(--success)" : "var(--border-accent)"}`,
                         }}
                       >
-                        {(m.displayName || m.walletAddress)[0].toUpperCase()}
+                        {m.connectionStatus === "ACCEPTED"
+                          ? <Link size={14} strokeWidth={1.5} />
+                          : (m.displayName || m.walletAddress)[0].toUpperCase()
+                        }
                       </div>
                       <div>
                         <p className="text-sm font-medium">
@@ -913,15 +1016,15 @@ export default function DashboardPage() {
                     </div>
                   </button>
 
-                  {/* Expanded: show their compass overlay */}
+                  {/* Expanded: compass overlay + connection action */}
                   {expandedMatch === m.userId && compass && (
-                    <div className="px-4 pb-4 pt-0">
+                    <div className="px-4 pb-4 pt-0 space-y-3">
                       <CompassChart
                         dimensions={m.dimensions}
                         confidence={{}}
                         overlayDimensions={compass.dimensions}
                       />
-                      <div className="flex flex-wrap gap-1.5 mt-3">
+                      <div className="flex flex-wrap gap-1.5">
                         {Object.entries(m.dimensions).map(([axis, val]) => (
                           <span
                             key={axis}
@@ -951,10 +1054,185 @@ export default function DashboardPage() {
                           </span>
                         ))}
                       </div>
+
+                      {/* Connection action buttons */}
+                      <div className="pt-2 border-t" style={{ borderColor: "var(--border-color)" }}>
+                        {m.connectionStatus === "ACCEPTED" ? (
+                          <a
+                            href={`https://chat.blockscan.com/eth/${m.walletAddress}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-primary text-sm py-2 px-4 w-full flex items-center justify-center gap-2"
+                          >
+                            <MessageSquare size={14} strokeWidth={1.5} />
+                            {t("chat_blockscan", language)}
+                            <ExternalLink size={12} strokeWidth={1.5} />
+                          </a>
+                        ) : m.connectionStatus === "PENDING" && m.connectionDirection === "sent" ? (
+                          <div className="flex gap-2">
+                            <span className="flex-1 flex items-center justify-center gap-1.5 text-sm py-2 rounded-xl" style={{ background: "var(--component-primary)", color: "var(--text-muted)" }}>
+                              <Clock size={14} strokeWidth={1.5} />
+                              {t("pending_btn", language)}
+                            </span>
+                            <button
+                              onClick={() => m.connectionId && handleCancelConnection(m.connectionId)}
+                              className="btn-outline text-sm py-2 px-4 flex items-center gap-1.5"
+                              style={{ color: "var(--error)" }}
+                            >
+                              <X size={14} strokeWidth={1.5} />
+                              {t("cancel_btn", language)}
+                            </button>
+                          </div>
+                        ) : m.connectionStatus === "PENDING" && m.connectionDirection === "received" ? (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => m.connectionId && handleRespond(m.connectionId, "ACCEPTED")}
+                              className="btn-primary text-sm py-2 px-4 flex-1 flex items-center justify-center gap-1.5"
+                              disabled={respondingTo === m.connectionId}
+                            >
+                              <Check size={14} strokeWidth={1.5} />
+                              {t("accept_btn", language)}
+                            </button>
+                            <button
+                              onClick={() => m.connectionId && handleRespond(m.connectionId, "DECLINED")}
+                              className="btn-outline text-sm py-2 px-4 flex items-center gap-1.5"
+                              style={{ color: "var(--error)" }}
+                              disabled={respondingTo === m.connectionId}
+                            >
+                              <X size={14} strokeWidth={1.5} />
+                              {t("decline_btn", language)}
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleConnect(m.userId, m.mode, m.score)}
+                            className="btn-primary text-sm py-2 px-4 w-full flex items-center justify-center gap-1.5"
+                            disabled={connectingTo === m.userId}
+                          >
+                            {connectingTo === m.userId ? (
+                              <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />
+                            ) : (
+                              <UserPlus size={14} strokeWidth={1.5} />
+                            )}
+                            {t("connect_btn", language)}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Incoming connection requests */}
+          {incomingRequests.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <UserPlus size={14} strokeWidth={1.5} style={{ color: "var(--accent-primary)" }} />
+                {t("incoming_requests", language)}
+                <span className="text-xs font-mono rounded-full px-2 py-0.5" style={{ background: "var(--accent-gradient-soft)", color: "var(--accent-primary)" }}>
+                  {incomingRequests.length}
+                </span>
+              </h3>
+              <div className="space-y-2">
+                {incomingRequests.map((req) => (
+                  <div key={req.id} className="card p-4" style={{ border: "1px solid var(--border-accent)" }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                          style={{
+                            background: "var(--accent-gradient-soft)",
+                            color: "var(--accent-primary)",
+                            border: "1px solid var(--border-accent)",
+                          }}
+                        >
+                          {(req.sender.displayName || req.sender.walletAddress)[0].toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{req.sender.displayName || t("anonymous_user", language)}</p>
+                          <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                            {t("match_mode_label", language)}: {req.matchMode} · {Math.round(req.matchScore * 100)}%
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    {req.message && (
+                      <p className="text-xs mb-3 px-3 py-2 rounded-lg" style={{ background: "var(--component-primary)", color: "var(--text-secondary)" }}>
+                        &ldquo;{req.message}&rdquo;
+                      </p>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleRespond(req.id, "ACCEPTED")}
+                        className="btn-primary text-xs py-1.5 px-4 flex-1 flex items-center justify-center gap-1.5"
+                        disabled={respondingTo === req.id}
+                      >
+                        <Check size={12} strokeWidth={1.5} />
+                        {t("accept_btn", language)}
+                      </button>
+                      <button
+                        onClick={() => handleRespond(req.id, "DECLINED")}
+                        className="btn-outline text-xs py-1.5 px-4 flex items-center gap-1.5"
+                        style={{ color: "var(--error)" }}
+                        disabled={respondingTo === req.id}
+                      >
+                        <X size={12} strokeWidth={1.5} />
+                        {t("decline_btn", language)}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Active connections */}
+          {connections.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <Link size={14} strokeWidth={1.5} style={{ color: "var(--success)" }} />
+                {t("your_connections", language)}
+                <span className="text-xs font-mono rounded-full px-2 py-0.5" style={{ background: "rgba(14, 187, 144, 0.1)", color: "var(--success)" }}>
+                  {connections.length}
+                </span>
+              </h3>
+              <div className="space-y-2">
+                {connections.map((c) => (
+                  <div key={c.connectionId} className="card p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center text-sm"
+                          style={{ background: "var(--success)", color: "#fff" }}
+                        >
+                          <Link size={14} strokeWidth={1.5} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{c.displayName || t("anonymous_user", language)}</p>
+                          <p className="text-xs font-mono" style={{ color: "var(--text-secondary)" }}>
+                            {c.walletAddress}
+                          </p>
+                          <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                            {t("match_mode_label", language)}: {c.matchMode} · {Math.round(c.matchScore * 100)}%
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <a
+                      href={c.blockscanChatUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-primary text-xs py-2 px-4 mt-3 w-full flex items-center justify-center gap-2"
+                    >
+                      <MessageSquare size={14} strokeWidth={1.5} />
+                      {t("chat_blockscan", language)}
+                      <ExternalLink size={12} strokeWidth={1.5} />
+                    </a>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
