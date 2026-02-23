@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useDisconnect } from "wagmi";
 import { useAppStore } from "@/lib/store";
 import { t, axisLabel, AXIS_KEYS } from "@/lib/i18n";
 import {
@@ -101,6 +102,7 @@ type MatchMode = "mirror" | "challenger" | "complement";
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { disconnect: disconnectWallet } = useDisconnect();
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
   const [tab, setTab] = useState<Tab>("compass");
@@ -385,6 +387,7 @@ export default function DashboardPage() {
           <SettingsBar />
           <button
             onClick={() => {
+              disconnectWallet();
               useAppStore.getState().logout();
               router.push("/");
             }}
