@@ -14,15 +14,18 @@ import {
   diffSnapshots,
   getFrequencyPreference,
   setFrequencyPreference,
+  getMatches,
+  getMatchSettings,
+  updateMatchSettings,
 } from "@/lib/api";
 import { CompassChart } from "@/components/compass-chart";
 import { Compass3D } from "@/components/compass-3d";
 import { CompassResultCard } from "@/components/compass-result-card";
 import { QuestionCard } from "@/components/question-card";
 import { SettingsBar } from "@/components/settings-bar";
-import { Share2, LogOut, GitCompare, Clock, Check, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
+import { Share2, LogOut, GitCompare, Clock, Check, ArrowUpRight, ArrowDownRight, Minus, Users, Shield, Eye, EyeOff, Loader2 } from "lucide-react";
 
-type Tab = "compass" | "session" | "history" | "wallet";
+type Tab = "compass" | "session" | "history" | "community" | "wallet";
 
 interface Snapshot {
   id: string;
@@ -53,6 +56,17 @@ interface Question {
   weights: Record<string, number>;
 }
 
+interface MatchResult {
+  userId: string;
+  walletAddress: string;
+  displayName: string | null;
+  dimensions: Record<string, number>;
+  score: number;
+  mode: string;
+}
+
+type MatchMode = "mirror" | "challenger" | "complement";
+
 export default function DashboardPage() {
   const router = useRouter();
   const user = useAppStore((s) => s.user);
@@ -77,6 +91,18 @@ export default function DashboardPage() {
   // Frequency state
   const [frequency, setFrequency] = useState<string>("WEEKLY");
 
+  // Community / Matchmaking state
+  const [matchMode, setMatchMode] = useState<MatchMode>("mirror");
+  const [matches, setMatches] = useState<MatchResult[]>([]);
+  const [matchesLoading, setMatchesLoading] = useState(false);
+  const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
+
+  // Privacy settings state
+  const [sharingMode, setSharingMode] = useState<string>("GHOST");
+  const [displayName, setDisplayName] = useState("");
+  const [matchThreshold, setMatchThreshold] = useState(0.8);
+  const [settingsSaved, setSettingsSaved] = useState(false);
+
   // Session state
   const [sessionQuestions, setSessionQuestions] = useState<Question[]>([]);
   const [sessionIndex, setSessionIndex] = useState(0);
@@ -91,17 +117,23 @@ export default function DashboardPage() {
 
     async function load() {
       try {
-        const [compassData, historyData, walletData, freqData] = await Promise.all([
+        const [compassData, historyData, walletData, freqData, matchSettingsData] = await Promise.all([
           getCompass(user!.id),
           getHistory(user!.id),
           getWallet(user!.id).catch(() => null),
           getFrequencyPreference().catch(() => null),
+          getMatchSettings().catch(() => null),
         ]);
         setCompass(compassData);
         setHistory(historyData);
         setWallet(walletData);
         if (freqData?.frequencyPreference) {
           setFrequency(freqData.frequencyPreference);
+        }
+        if (matchSettingsData) {
+          setSharingMode(matchSettingsData.sharingMode ?? "GHOST");
+          setDisplayName(matchSettingsData.displayName ?? "");
+          setMatchThreshold(matchSettingsData.matchThreshold ?? 0.8);
         }
       } catch (err) {
         console.error("Failed to load dashboard data:", err);
@@ -159,6 +191,35 @@ export default function DashboardPage() {
     }
   }
 
+  // Load matches for the selected mode
+  async function loadMatches(mode: MatchMode) {
+    setMatchesLoading(true);
+    try {
+      const result = await getMatches(mode, 10);
+      setMatches(result);
+    } catch (err) {
+      console.error("Failed to load matches:", err);
+      setMatches([]);
+    } finally {
+      setMatchesLoading(false);
+    }
+  }
+
+  // Save privacy/sharing settings
+  async function handleSaveSettings() {
+    try {
+      await updateMatchSettings({
+        sharingMode,
+        displayName: displayName || undefined,
+        matchThreshold,
+      });
+      setSettingsSaved(true);
+      setTimeout(() => setSettingsSaved(false), 2000);
+    } catch (err) {
+      console.error("Failed to save settings:", err);
+    }
+  }
+
   async function loadSession() {
     if (!user) return;
     setSessionLoading(true);
@@ -211,6 +272,7 @@ export default function DashboardPage() {
     { id: "compass", label: t("tab_compass", language) },
     { id: "session", label: t("tab_session", language) },
     { id: "history", label: t("tab_history", language) },
+    { id: "community", label: t("tab_community", language) },
     { id: "wallet", label: t("tab_wallet", language) },
   ];
 
@@ -236,7 +298,7 @@ export default function DashboardPage() {
 
       {/* Tab bar */}
       <div
-        className="grid grid-cols-4 sm:flex gap-1 rounded-xl p-1 mb-6 sm:mb-8"
+        className="grid grid-cols-5 sm:flex gap-1 rounded-xl p-1 mb-6 sm:mb-8"
         style={{ background: "var(--bg-card)" }}
       >
         {tabs.map((t) => (
@@ -669,6 +731,231 @@ export default function DashboardPage() {
                 </div>
               </div>
             </>
+          )}
+        </div>
+      )}
+
+      {/* Community tab */}
+      {tab === "community" && (
+        <div className="space-y-6">
+          {/* Privacy settings card */}
+          <div className="card p-5 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Shield size={16} style={{ color: "var(--accent-primary)" }} />
+              <h3 className="text-sm font-semibold">{t("privacy_title", language)}</h3>
+            </div>
+
+            {/* Sharing mode selector */}
+            <div>
+              <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
+                {t("sharing_mode", language)}
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { mode: "GHOST", icon: <EyeOff size={14} />, label: t("mode_ghost", language), desc: t("mode_ghost_desc", language) },
+                  { mode: "PUBLIC", icon: <Eye size={14} />, label: t("mode_public", language), desc: t("mode_public_desc", language) },
+                  { mode: "SELECTIVE", icon: <Users size={14} />, label: t("mode_selective", language), desc: t("mode_selective_desc", language) },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.mode}
+                    onClick={() => setSharingMode(opt.mode)}
+                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-all"
+                    style={{
+                      background: sharingMode === opt.mode ? "var(--accent-gradient-soft)" : "var(--component-primary)",
+                      border: `1px solid ${sharingMode === opt.mode ? "var(--border-accent)" : "var(--border-color)"}`,
+                      color: sharingMode === opt.mode ? "var(--accent-primary)" : "var(--text-secondary)",
+                    }}
+                  >
+                    {opt.icon}
+                    <span className="text-xs font-semibold">{opt.label}</span>
+                    <span className="text-[10px] leading-tight" style={{ color: "var(--text-muted)" }}>{opt.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Display name */}
+            <div>
+              <label className="text-xs block mb-1" style={{ color: "var(--text-secondary)" }}>
+                {t("display_name", language)}
+              </label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder={t("display_name_placeholder", language)}
+                className="w-full rounded-xl px-4 py-2 text-sm outline-none min-h-[44px]"
+                style={{
+                  background: "var(--bg-card)",
+                  border: "1px solid var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+              />
+            </div>
+
+            {/* Match threshold slider */}
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                  {t("match_threshold_label", language)}
+                </label>
+                <span className="text-xs font-mono" style={{ color: "var(--accent-primary)" }}>
+                  {Math.round(matchThreshold * 100)}%
+                </span>
+              </div>
+              <p className="text-[10px] mb-2" style={{ color: "var(--text-muted)" }}>
+                {t("match_threshold_desc", language)}
+              </p>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={Math.round(matchThreshold * 100)}
+                onChange={(e) => setMatchThreshold(parseInt(e.target.value) / 100)}
+                className="w-full accent-[var(--accent-primary)]"
+              />
+            </div>
+
+            {/* Save button */}
+            <button
+              onClick={handleSaveSettings}
+              className="btn-primary text-sm py-2 px-6 w-full justify-center flex items-center gap-1.5"
+            >
+              {settingsSaved ? (
+                <><Check size={14} /> {t("settings_saved", language)}</>
+              ) : (
+                t("save_snapshot", language)
+              )}
+            </button>
+          </div>
+
+          {/* Match mode selector */}
+          <div>
+            <h3 className="text-sm font-semibold mb-3">{t("community_title", language)}</h3>
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {([
+                { mode: "mirror" as MatchMode, label: t("mode_mirror", language), desc: t("mode_mirror_desc", language), emoji: "🪞" },
+                { mode: "challenger" as MatchMode, label: t("mode_challenger", language), desc: t("mode_challenger_desc", language), emoji: "⚔️" },
+                { mode: "complement" as MatchMode, label: t("mode_complement", language), desc: t("mode_complement_desc", language), emoji: "🧩" },
+              ]).map((opt) => (
+                <button
+                  key={opt.mode}
+                  onClick={() => { setMatchMode(opt.mode); loadMatches(opt.mode); }}
+                  className="flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-all"
+                  style={{
+                    background: matchMode === opt.mode ? "var(--accent-gradient)" : "var(--component-primary)",
+                    border: `1px solid ${matchMode === opt.mode ? "transparent" : "var(--border-color)"}`,
+                    color: matchMode === opt.mode ? "#111" : "var(--text-secondary)",
+                  }}
+                >
+                  <span className="text-lg">{opt.emoji}</span>
+                  <span className="text-xs font-semibold">{opt.label}</span>
+                  <span className="text-[10px] leading-tight" style={{ color: matchMode === opt.mode ? "rgba(0,0,0,0.6)" : "var(--text-muted)" }}>
+                    {opt.desc}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Match results */}
+          {matchesLoading ? (
+            <div className="flex items-center justify-center py-12 gap-2" style={{ color: "var(--text-secondary)" }}>
+              <Loader2 size={16} className="animate-spin" />
+              <span className="text-sm">{t("loading_matches", language)}</span>
+            </div>
+          ) : matches.length === 0 && matchMode ? (
+            <p className="text-center py-8 text-sm" style={{ color: "var(--text-muted)" }}>
+              {t("no_matches", language)}
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {matches.map((m) => (
+                <div
+                  key={m.userId}
+                  className="card overflow-hidden transition-all"
+                  style={{
+                    border: expandedMatch === m.userId ? "1px solid var(--border-accent)" : undefined,
+                  }}
+                >
+                  <button
+                    onClick={() => setExpandedMatch(expandedMatch === m.userId ? null : m.userId)}
+                    className="w-full p-4 flex items-center justify-between text-start"
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* Avatar placeholder */}
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold"
+                        style={{
+                          background: "var(--accent-gradient-soft)",
+                          color: "var(--accent-primary)",
+                          border: "1px solid var(--border-accent)",
+                        }}
+                      >
+                        {(m.displayName || m.walletAddress)[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">
+                          {m.displayName || t("anonymous_user", language)}
+                        </p>
+                        <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                          {m.walletAddress}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-end">
+                      <p className="text-lg font-bold text-gradient">
+                        {Math.round(m.score * 100)}%
+                      </p>
+                      <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                        {t("match_score", language)}
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Expanded: show their compass overlay */}
+                  {expandedMatch === m.userId && compass && (
+                    <div className="px-4 pb-4 pt-0">
+                      <CompassChart
+                        dimensions={m.dimensions}
+                        confidence={{}}
+                        overlayDimensions={compass.dimensions}
+                      />
+                      <div className="flex flex-wrap gap-1.5 mt-3">
+                        {Object.entries(m.dimensions).map(([axis, val]) => (
+                          <span
+                            key={axis}
+                            className="tag text-xs"
+                            style={{
+                              background:
+                                (val as number) > 0
+                                  ? "rgba(14, 187, 144, 0.1)"
+                                  : (val as number) < 0
+                                    ? "rgba(224, 81, 77, 0.1)"
+                                    : "var(--component-primary)",
+                              borderColor:
+                                (val as number) > 0
+                                  ? "rgba(14, 187, 144, 0.3)"
+                                  : (val as number) < 0
+                                    ? "rgba(224, 81, 77, 0.3)"
+                                    : "var(--border-color)",
+                              color:
+                                (val as number) > 0
+                                  ? "var(--success)"
+                                  : (val as number) < 0
+                                    ? "var(--error)"
+                                    : "var(--text-muted)",
+                            }}
+                          >
+                            {axisLabel(axis, language)}: {(val as number).toFixed(2)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}

@@ -119,6 +119,28 @@ export async function setFrequencyPreference(frequency: string) {
   return data;
 }
 
+// --- Matchmaking ---
+export async function getMatches(mode: string = 'mirror', limit = 10, threshold?: number) {
+  const params: Record<string, string | number> = { mode, limit };
+  if (threshold !== undefined) params.threshold = threshold;
+  const { data } = await api.get("/matches/suggest", { params });
+  return data;
+}
+
+export async function getMatchSettings() {
+  const { data } = await api.get("/matches/settings");
+  return data;
+}
+
+export async function updateMatchSettings(settings: {
+  sharingMode?: string;
+  displayName?: string;
+  matchThreshold?: number;
+}) {
+  const { data } = await api.post("/matches/settings", settings);
+  return data;
+}
+
 // --- Wallet ---
 export async function getWallet(userId: string) {
   const { data } = await api.get("/wallet", { params: { userId } });

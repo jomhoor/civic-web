@@ -151,6 +151,36 @@ const en = {
   share_discover: "Discover yours →",
   site_url: "civiccompass.app",
 
+  // Community / Matchmaking
+  tab_community: "Community",
+  community_title: "Find Your Match",
+  mode_mirror: "Mirror",
+  mode_mirror_desc: "Find your civic soulmate — closest compass shape",
+  mode_challenger: "Challenger",
+  mode_challenger_desc: "Find your opposite — meaningful debate partner",
+  mode_complement: "Complement",
+  mode_complement_desc: "Find balance — shared core values, diverse strengths",
+  match_score: "Match",
+  no_matches: "No matches found. Try adjusting your threshold or sharing mode.",
+  loading_matches: "Finding matches…",
+  view_match: "View",
+  anonymous_user: "Anonymous",
+
+  // Privacy / Sharing
+  privacy_title: "Privacy & Sharing",
+  sharing_mode: "Sharing Mode",
+  mode_ghost: "Ghost",
+  mode_ghost_desc: "Private — invisible to others",
+  mode_public: "Public",
+  mode_public_desc: "Discoverable in search & matchmaking",
+  mode_selective: "Selective",
+  mode_selective_desc: "Only visible to high-compatibility matches",
+  display_name: "Display Name",
+  display_name_placeholder: "Anonymous handle (optional)",
+  match_threshold_label: "Match Threshold",
+  match_threshold_desc: "Minimum compatibility % to show",
+  settings_saved: "Settings saved",
+
   // Welcome
   welcome_choose_lang: "Choose your language to get started",
   tap_switch_appearance: "Tap to switch appearance",
@@ -304,6 +334,36 @@ const fa: typeof en = {
   share_text: "قطب‌نمای مدنی من 🧭",
   share_discover: "قطب‌نمای خودت را کشف کن ←",
   site_url: "civiccompass.app",
+
+  // Community / Matchmaking
+  tab_community: "جامعه",
+  community_title: "همتای خود را پیدا کنید",
+  mode_mirror: "آینه",
+  mode_mirror_desc: "همتای مدنی خود را پیدا کنید — نزدیک‌ترین شکل قطب‌نما",
+  mode_challenger: "چالشگر",
+  mode_challenger_desc: "مقابل خود را پیدا کنید — شریک بحث معنادار",
+  mode_complement: "مکمل",
+  mode_complement_desc: "تعادل بیابید — ارزش‌های مشترک، نقاط قوت متنوع",
+  match_score: "تطابق",
+  no_matches: "تطابقی پیدا نشد. آستانه یا حالت اشتراک‌گذاری را تنظیم کنید.",
+  loading_matches: "در حال یافتن تطابق‌ها…",
+  view_match: "مشاهده",
+  anonymous_user: "ناشناس",
+
+  // Privacy / Sharing
+  privacy_title: "حریم خصوصی و اشتراک‌گذاری",
+  sharing_mode: "حالت اشتراک‌گذاری",
+  mode_ghost: "مخفی",
+  mode_ghost_desc: "خصوصی — برای دیگران نامرئی",
+  mode_public: "عمومی",
+  mode_public_desc: "قابل کشف در جستجو و تطبیق",
+  mode_selective: "انتخابی",
+  mode_selective_desc: "فقط برای تطابق‌های بالا نمایش داده می‌شود",
+  display_name: "نام نمایشی",
+  display_name_placeholder: "نام مستعار (اختیاری)",
+  match_threshold_label: "آستانه تطابق",
+  match_threshold_desc: "حداقل درصد سازگاری برای نمایش",
+  settings_saved: "تنظیمات ذخیره شد",
 
   // Welcome
   welcome_choose_lang: "برای شروع زبان خود را انتخاب کنید",
