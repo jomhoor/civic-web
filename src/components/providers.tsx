@@ -7,6 +7,7 @@ import "@rainbow-me/rainbowkit/styles.css";
 import { wagmiConfig } from "@/lib/wagmi";
 import { useAppStore } from "@/lib/store";
 import { useState, type ReactNode } from "react";
+import { polygon } from "wagmi/chains";
 
 export function Providers({ children }: { children: ReactNode }) {
   const theme = useAppStore((s) => s.theme);
@@ -38,7 +39,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider theme={rkTheme} locale="en">
+        <RainbowKitProvider theme={rkTheme} locale="en" initialChain={polygon}>
           {children}
         </RainbowKitProvider>
       </QueryClientProvider>

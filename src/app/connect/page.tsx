@@ -25,9 +25,48 @@ export default function ConnectPage() {
   const [status, setStatus] = useState<"idle" | "signing" | "switching" | "verifying" | "error">("idle");
   const [error, setError] = useState("");
   const [siweAttempted, setSiweAttempted] = useState(false);
+  const [chainReady, setChainReady] = useState(false);
 
   /**
-   * SIWE flow:
+   * Step 0 — As soon as the wallet connects, ensure we're on Polygon.
+   * This runs eagerly (before SIWE) so wagmi's internal state stays consistent.
+   */
+  useEffect(() => {
+    if (!isConnected || !address || !chainId) {
+      setChainReady(false);
+      return;
+    }
+
+    if (chainId === polygon.id) {
+      setChainReady(true);
+      return;
+    }
+
+    // Wrong chain — switch
+    let cancelled = false;
+    setStatus("switching");
+    switchChainAsync({ chainId: polygon.id })
+      .then(() => {
+        if (!cancelled) setChainReady(true);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("Chain switch failed:", err);
+        setError(
+          language === "fa"
+            ? "لطفاً شبکه کیف پول را به Polygon تغییر دهید."
+            : "Please switch your wallet to the Polygon network."
+        );
+        setStatus("error");
+        setSiweAttempted(false);
+        disconnect();
+      });
+
+    return () => { cancelled = true; };
+  }, [isConnected, address, chainId, switchChainAsync, disconnect, language]);
+
+  /**
+   * SIWE flow (runs only after chain is confirmed as Polygon):
    * 1) Get nonce from backend
    * 2) Build SIWE message
    * 3) User signs in wallet
@@ -35,23 +74,14 @@ export default function ConnectPage() {
    * 5) Store & redirect
    */
   const handleSiwe = useCallback(async () => {
-    if (!address || !chainId) return;
-    if (siweAttempted) return; // prevent double-fire
+    if (!address) return;
+    if (siweAttempted) return;
     setSiweAttempted(true);
 
+    setStatus("signing");
     setError("");
 
     try {
-      // 0. Switch to Polygon if needed
-      let activeChainId = chainId;
-      if (chainId !== polygon.id) {
-        setStatus("switching");
-        await switchChainAsync({ chainId: polygon.id });
-        activeChainId = polygon.id;
-      }
-
-      setStatus("signing");
-
       // 1. Get nonce
       const { nonce } = await getNonce();
 
@@ -62,12 +92,12 @@ export default function ConnectPage() {
         statement: "Sign in to Civic Compass",
         uri: window.location.origin,
         version: "1",
-        chainId: activeChainId,
+        chainId: polygon.id,
         nonce,
       });
       const messageStr = siweMessage.prepareMessage();
 
-      // 3. Sign — this opens the MetaMask signature popup
+      // 3. Sign
       const signature = await signMessageAsync({ message: messageStr });
 
       // 4. Verify with backend
@@ -85,17 +115,16 @@ export default function ConnectPage() {
         : msg);
       setStatus("error");
       setSiweAttempted(false);
-      // Disconnect so the user can retry cleanly
       disconnect();
     }
-  }, [address, chainId, signMessageAsync, setAuth, router, disconnect, language, siweAttempted]);
+  }, [address, signMessageAsync, setAuth, router, disconnect, language, siweAttempted]);
 
-  // When wallet connects, auto-trigger SIWE
+  // When chain is confirmed and wallet is connected, auto-trigger SIWE
   useEffect(() => {
-    if (isConnected && address && status === "idle") {
+    if (chainReady && isConnected && address && status !== "error" && status !== "signing" && status !== "verifying") {
       handleSiwe();
     }
-  }, [isConnected, address, status, handleSiwe]);
+  }, [chainReady, isConnected, address, status, handleSiwe]);
 
   const statusMessage = status === "switching"
     ? (language === "fa" ? "لطفاً به شبکه Polygon تغییر دهید..." : "Switching to Polygon network...")

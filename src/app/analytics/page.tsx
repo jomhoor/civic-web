@@ -451,8 +451,9 @@ export default function AnalyticsPage() {
                               formatter={(
                                 _val: unknown,
                                 _name: unknown,
-                                props: { payload: { raw: string } }
-                              ) => [props.payload.raw, "Score"]}
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                props: any
+                              ) => [props?.payload?.raw ?? _val, "Score"]}
                             />
                           </RadarChart>
                         </ResponsiveContainer>
