@@ -4,7 +4,7 @@ import { createGuestSession, getNonce, verifySiwe } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useAppStore } from "@/lib/store";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { Loader2, Lock, UserCircle, Wallet } from "lucide-react";
+import { ExternalLink, HelpCircle, Loader2, Lock, UserCircle, Wallet, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { SiweMessage } from "siwe";
@@ -26,6 +26,7 @@ export default function ConnectPage() {
   const [status, setStatus] = useState<"idle" | "signing" | "switching" | "verifying" | "error">("idle");
   const [error, setError] = useState("");
   const [siweAttempted, setSiweAttempted] = useState(false);
+  const [showWalletInfo, setShowWalletInfo] = useState(false);
 
   /**
    * Combined chain-switch + SIWE flow.
@@ -140,6 +141,15 @@ export default function ConnectPage() {
           {t("connect_desc", language)}
         </p>
 
+        <button
+          onClick={() => setShowWalletInfo(true)}
+          className="flex items-center justify-center gap-1.5 text-xs mx-auto transition-opacity hover:opacity-80"
+          style={{ color: "var(--accent-primary)", marginTop: "-1rem" }}
+        >
+          <HelpCircle size={14} strokeWidth={1.5} />
+          {t("wallet_info_title", language)}
+        </button>
+
         {statusMessage ? (
           <div className="flex flex-col items-center gap-3 py-4">
             <Loader2 size={24} strokeWidth={1.5} className="animate-spin" style={{ color: "var(--accent-primary)" }} />
@@ -204,7 +214,60 @@ export default function ConnectPage() {
             {t("connect_footer", language)}
           </p>
         </div>
+
       </div>
+
+      {/* Wallet Info Popup */}
+      {showWalletInfo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.5)" }}
+          onClick={() => setShowWalletInfo(false)}
+        >
+          <div
+            className="card p-6 sm:p-8 flex flex-col gap-4 max-w-md w-full shadow-xl relative"
+            dir={language === "fa" ? "rtl" : "ltr"}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowWalletInfo(false)}
+              className="absolute top-3 right-3 p-1 rounded-lg transition-colors hover:opacity-70"
+              style={{ color: "var(--text-muted)" }}
+            >
+              <X size={18} strokeWidth={1.5} />
+            </button>
+
+            <div className="flex items-center gap-2">
+              <Wallet size={22} strokeWidth={1.5} style={{ color: "var(--accent-primary)" }} />
+              <h3 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
+                {t("wallet_info_title", language)}
+              </h3>
+            </div>
+
+            <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+              {t("wallet_info_body", language)}
+            </p>
+
+            <a
+              href={t("wallet_info_link", language)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-80"
+              style={{ color: "var(--accent-primary)" }}
+            >
+              <ExternalLink size={14} strokeWidth={1.5} />
+              {t("wallet_info_link_label", language)}
+            </a>
+
+            <button
+              onClick={() => setShowWalletInfo(false)}
+              className="btn-primary w-full mt-2 justify-center text-sm"
+            >
+              {t("wallet_info_close", language)}
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
