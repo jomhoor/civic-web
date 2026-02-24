@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useEffect, useCallback, forwardRef, useImperativeHandle, useState } from "react";
-import { useAppStore } from "@/lib/store";
 import { axisLabel } from "@/lib/i18n";
 import { generateProfileQR, QR_SIZE } from "@/lib/qr";
+import { useAppStore } from "@/lib/store";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 /* ── Constants ── */
 const TAU = Math.PI * 2;

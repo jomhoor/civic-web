@@ -1,10 +1,10 @@
 "use client";
 
-import { Compass3D } from "@/components/compass-3d";
 import type { Compass3DHandle } from "@/components/compass-3d";
+import { Compass3D } from "@/components/compass-3d";
 import { PageNavBar } from "@/components/page-nav-bar";
-import { PoliticalCompassChart } from "@/components/political-compass-chart";
 import type { CompassChartHandle } from "@/components/political-compass-chart";
+import { PoliticalCompassChart } from "@/components/political-compass-chart";
 import { QuestionCard } from "@/components/question-card";
 import { QuestionnaireIcon } from "@/components/questionnaire-icon";
 import {
@@ -40,15 +40,13 @@ import {
     updateMatchSettings,
 } from "@/lib/api";
 import {
-    clearChatKeys,
     computeSharedSecret,
     decryptMessage,
     deriveChatKeyPair,
     encryptMessage,
-    getCachedKeyPair,
     getChatSignMessage,
     getPublicKeyBase64,
-    isChatReady,
+    isChatReady
 } from "@/lib/chat-crypto";
 import { AXIS_KEYS, axisLabel, t } from "@/lib/i18n";
 import { useAppStore } from "@/lib/store";

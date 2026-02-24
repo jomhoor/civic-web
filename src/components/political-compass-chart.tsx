@@ -1,9 +1,9 @@
 "use client";
 
 import { t } from "@/lib/i18n";
+import { generateProfileQR, QR_SIZE } from "@/lib/qr";
 import { useAppStore } from "@/lib/store";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { generateProfileQR, QR_SIZE } from "@/lib/qr";
 
 export interface CompassChartHandle {
   toDataURL: () => Promise<string | null>;

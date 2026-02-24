@@ -10,7 +10,7 @@
  */
 
 import nacl from "tweetnacl";
-import { encodeBase64, decodeBase64 } from "tweetnacl-util";
+import { decodeBase64, encodeBase64 } from "tweetnacl-util";
 
 const CHAT_SIGN_MESSAGE = "civic-chat-keypair-v1";
 

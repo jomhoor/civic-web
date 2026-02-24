@@ -1,14 +1,14 @@
 "use client";
 
-import { Compass3D } from "@/components/compass-3d";
 import type { Compass3DHandle } from "@/components/compass-3d";
+import { Compass3D } from "@/components/compass-3d";
 import { PageNavBar } from "@/components/page-nav-bar";
-import { PoliticalCompassChart } from "@/components/political-compass-chart";
 import type { CompassChartHandle } from "@/components/political-compass-chart";
+import { PoliticalCompassChart } from "@/components/political-compass-chart";
 import { getPokeStatus, getPublicProfile, sendPoke } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useAppStore } from "@/lib/store";
-import { ArrowLeft, Check, Copy, Download, Lock, MessageCircle, Share2, Zap } from "lucide-react";
+import { ArrowLeft, Check, Copy, Download, Lock, Share2, Zap } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
