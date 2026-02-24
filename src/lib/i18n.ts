@@ -402,8 +402,8 @@ const fa: typeof en = {
 
   // Connect
   connect_title: "اتصال به قطب‌نمای مدنی",
-  connect_desc: "در نسخه کامل، با MetaMask یا کیف پول هوشمند متصل می‌شوید. فعلاً روی دکمه زیر کلیک کنید.",
-  connect_button: "شروع سریع (حالت توسعه)",
+  connect_desc: "با کیف پول هوشمند متصل می‌شوید",
+  connect_button: "شروع سریع ",
   connect_button_loading: "در حال اتصال...",
   connect_error: "اتصال ناموفق. آیا بک‌اند روی پورت 3001 اجرا می‌شود؟",
   connect_footer: "MetaMask و WalletConnect در تکمیل فاز ۱",

@@ -169,6 +169,7 @@ function DashboardContent() {
   const [snapshotName, setSnapshotName] = useState("");
   const [snapshotSaved, setSnapshotSaved] = useState(false);
   const [profileCopied, setProfileCopied] = useState(false);
+  const [walletPrompt, setWalletPrompt] = useState<"share" | "profile" | null>(null);
 
   // Poke state
   const [receivedPokes, setReceivedPokes] = useState<{
@@ -746,6 +747,7 @@ function DashboardContent() {
 
             {/* Download / Share */}
             <div className="flex items-center gap-1.5 flex-wrap">
+              {!isGuest && (
               <button
                 onClick={() => setShowUserId((v) => !v)}
                 className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all"
@@ -759,6 +761,7 @@ function DashboardContent() {
                 {showUserId ? <EyeOff size={12} strokeWidth={1.5} /> : <Eye size={12} strokeWidth={1.5} />}
                 {t("show_id", language)}
               </button>
+              )}
               <button
                 onClick={handleDownloadDiagram}
                 className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all"
@@ -772,24 +775,24 @@ function DashboardContent() {
                 {t("download", language)}
               </button>
               <button
-                onClick={handleShareDiagram}
+                onClick={isGuest ? () => setWalletPrompt("share") : handleShareDiagram}
                 className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all"
                 style={{
                   background: "var(--component-primary)",
                   border: "1px solid var(--border-color)",
-                  color: "var(--text-secondary)",
+                  color: isGuest ? "var(--text-muted)" : "var(--text-secondary)",
                 }}
               >
                 <Share2 size={12} strokeWidth={1.5} />
                 {t("share", language)}
               </button>
               <button
-                onClick={handleShareProfile}
+                onClick={isGuest ? () => setWalletPrompt("profile") : handleShareProfile}
                 className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all"
                 style={{
                   background: profileCopied ? "var(--accent-gradient-soft)" : "var(--component-primary)",
                   border: `1px solid ${profileCopied ? "var(--border-accent)" : "var(--border-color)"}`,
-                  color: profileCopied ? "var(--accent-primary)" : "var(--text-secondary)",
+                  color: isGuest ? "var(--text-muted)" : profileCopied ? "var(--accent-primary)" : "var(--text-secondary)",
                 }}
               >
                 <ExternalLink size={12} strokeWidth={1.5} />
@@ -2076,6 +2079,43 @@ function DashboardContent() {
           {t("analytics_explore", language)}
         </button>
       </div>
+
+      {/* Wallet Required Modal */}
+      {walletPrompt && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.5)" }}
+          onClick={() => setWalletPrompt(null)}
+        >
+          <div
+            className="card p-6 sm:p-8 flex flex-col items-center gap-4 text-center max-w-sm w-full shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Wallet size={32} strokeWidth={1.5} style={{ color: "var(--text-muted)" }} />
+            <h3 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
+              {t("guest_connect_title", language)}
+            </h3>
+            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              {t("guest_connect_community", language)}
+            </p>
+            <div className="flex gap-3 mt-2">
+              <button
+                onClick={() => setWalletPrompt(null)}
+                className="btn-outline px-5 py-2 text-sm"
+              >
+                {t("questionnaire_back", language)}
+              </button>
+              <button
+                onClick={() => { useAppStore.getState().logout(); router.push("/connect"); }}
+                className="btn-primary flex items-center gap-2 px-5 py-2 text-sm"
+              >
+                <Wallet size={16} strokeWidth={1.5} />
+                {t("connect_wallet", language)}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
