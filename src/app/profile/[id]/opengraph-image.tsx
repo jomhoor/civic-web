@@ -5,7 +5,11 @@ export const alt = "Civic Compass Profile";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-/* ── Constants ── */
+/* ── Constants (matching compass-3d.tsx) ── */
+const TAU = Math.PI * 2;
+const FOV = 600;
+const AXIS_OVERSHOOT = 1.15;
+
 const AXIS_KEYS = [
   "economy",
   "governance",
@@ -44,20 +48,58 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ??
   "http://localhost:3001/api";
 
-/* ── Generate radar polygon points ── */
-function radarPoint(
+/* ── 3D math helpers (same as compass-3d.tsx) ── */
+function hexRGBA(hex: string, a: number) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function fibSphere(n: number) {
+  const pts: { x: number; y: number; z: number }[] = [];
+  const golden = (1 + Math.sqrt(5)) / 2;
+  for (let i = 0; i < n; i++) {
+    const theta = Math.acos(1 - (2 * (i + 0.5)) / n);
+    const phi = (TAU * i) / golden;
+    pts.push({
+      x: Math.sin(theta) * Math.cos(phi),
+      y: Math.sin(theta) * Math.sin(phi),
+      z: Math.cos(theta),
+    });
+  }
+  return pts;
+}
+
+function rotate3D(
+  p: { x: number; y: number; z: number },
+  ay: number,
+  ax: number
+) {
+  const cosY = Math.cos(ay),
+    sinY = Math.sin(ay);
+  const x1 = p.x * cosY + p.z * sinY;
+  const z1 = -p.x * sinY + p.z * cosY;
+  const cosX = Math.cos(ax),
+    sinX = Math.sin(ax);
+  const y1 = p.y * cosX - z1 * sinX;
+  const z2 = p.y * sinX + z1 * cosX;
+  return { x: x1, y: y1, z: z2 };
+}
+
+function project(
+  p: { x: number; y: number; z: number },
   cx: number,
   cy: number,
-  radius: number,
-  index: number,
-  total: number,
-  value: number // 0–1
-): { x: number; y: number } {
-  const angle = (Math.PI * 2 * index) / total - Math.PI / 2;
-  return {
-    x: cx + radius * value * Math.cos(angle),
-    y: cy + radius * value * Math.sin(angle),
-  };
+  scale: number
+) {
+  const f = FOV / (FOV + p.z * scale);
+  return { x: cx + p.x * scale * f, y: cy + p.y * scale * f, f, z: p.z };
+}
+
+/* ── Detect if text contains RTL characters ── */
+function isRTL(text: string): boolean {
+  return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
 }
 
 export default async function OGImage({
@@ -74,7 +116,7 @@ export default async function OGImage({
 
   try {
     const res = await fetch(`${API_BASE}/compass/profile/${userId}`, {
-      next: { revalidate: 300 }, // cache for 5 minutes
+      next: { revalidate: 300 },
     });
     if (res.ok) {
       const data = await res.json();
@@ -89,41 +131,73 @@ export default async function OGImage({
   // Normalize dimension values from [-1, 1] to [0, 1]
   const values = AXIS_KEYS.map((k) => ((dimensions[k] ?? 0) + 1) / 2);
 
-  // Radar chart geometry
-  const CX = 420;
+  // ── 3D projection (static snapshot at a nice angle) ──
+  const CX = 340;
   const CY = 315;
-  const R = 200;
-  const N = AXIS_KEYS.length;
+  const S = 180; // scale
+  const ANGLE_Y = 0.6; // fixed Y rotation (nice viewing angle)
+  const ANGLE_X = 0.35; // fixed X tilt
 
-  // Generate data polygon points
-  const dataPoints = values.map((v, i) => radarPoint(CX, CY, R, i, N, v));
-  const dataPath = dataPoints
-    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`)
-    .join(" ") + " Z";
+  const axes3D = fibSphere(AXIS_KEYS.length);
 
-  // Grid ring paths (33%, 66%, 100%)
-  const gridRings = [0.33, 0.66, 1.0].map((scale) => {
-    const pts = AXIS_KEYS.map((_, i) =>
-      radarPoint(CX, CY, R, i, N, scale)
-    );
+  // Project axis endpoints and data points
+  const axisEnds = axes3D.map((a) => {
+    const r = rotate3D(a, ANGLE_Y, ANGLE_X);
+    return project(r, CX, CY, S * AXIS_OVERSHOOT);
+  });
+
+  const dataEnds = axes3D.map((a, i) => {
+    const r = rotate3D(a, ANGLE_Y, ANGLE_X);
+    const rData = { x: r.x * values[i], y: r.y * values[i], z: r.z * values[i] };
+    return project(rData, CX, CY, S);
+  });
+
+  const zOrder = axes3D.map((a, i) => {
+    const r = rotate3D(a, ANGLE_Y, ANGLE_X);
+    return { i, z: r.z };
+  });
+
+  // Grid rings 
+  const gridRings = [0.33, 0.66, 1.0].map((gVal) => {
+    const pts = axes3D.map((a) => {
+      const r = rotate3D(
+        { x: a.x * gVal, y: a.y * gVal, z: a.z * gVal },
+        ANGLE_Y,
+        ANGLE_X
+      );
+      return project(r, CX, CY, S);
+    });
     return (
-      pts
-        .map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`)
-        .join(" ") + " Z"
+      pts.map((p, j) => `${j === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ") + " Z"
     );
   });
 
-  // Axis line endpoints
-  const axisEnds = AXIS_KEYS.map((_, i) =>
-    radarPoint(CX, CY, R * 1.15, i, N, 1)
-  );
+  // Data shape path
+  const dataPath =
+    dataEnds.map((p, j) => `${j === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ") + " Z";
+
+  // Triangle face paths (for depth shading)
+  const triangles = axes3D.map((_, t) => {
+    const t2 = (t + 1) % axes3D.length;
+    const avgZ = (zOrder[t].z + zOrder[t2].z) / 2;
+    const faceAlpha = 0.06 + (1 + avgZ) * 0.06;
+    return {
+      path: `M${CX},${CY} L${dataEnds[t].x.toFixed(1)},${dataEnds[t].y.toFixed(1)} L${dataEnds[t2].x.toFixed(1)},${dataEnds[t2].y.toFixed(1)} Z`,
+      color: hexRGBA(AXIS_COLORS[t], faceAlpha),
+    };
+  });
 
   // Label positions (pushed out further)
-  const labelPositions = AXIS_KEYS.map((_, i) =>
-    radarPoint(CX, CY, R * 1.35, i, N, 1)
-  );
+  const labelEnds = axes3D.map((a) => {
+    const r = rotate3D(a, ANGLE_Y, ANGLE_X);
+    return project(r, CX, CY, S * 1.4);
+  });
+
+  // Sort by depth for proper rendering  
+  const sortedZ = [...zOrder].sort((a, b) => a.z - b.z);
 
   const title = displayName || wallet || "Anonymous";
+  const titleIsRTL = isRTL(title);
 
   return new ImageResponse(
     (
@@ -135,14 +209,14 @@ export default async function OGImage({
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #0A0E1A 0%, #111827 50%, #0F172A 100%)",
+          background: "#111111",
           fontFamily: '"Inter", "Helvetica", sans-serif',
         }}
       >
-        {/* Left side — Compass visualization */}
+        {/* Left side — 3D Compass */}
         <div
           style={{
-            width: "840px",
+            width: "680px",
             height: "630px",
             display: "flex",
             alignItems: "center",
@@ -151,9 +225,9 @@ export default async function OGImage({
           }}
         >
           <svg
-            width="840"
+            width="680"
             height="630"
-            viewBox="0 0 840 630"
+            viewBox="0 0 680 630"
             style={{ position: "absolute", top: 0, left: 0 }}
           >
             {/* Grid rings */}
@@ -184,66 +258,80 @@ export default async function OGImage({
             {/* Axis endpoint dots */}
             {axisEnds.map((end, i) => (
               <circle
-                key={`dot-${i}`}
+                key={`adot-${i}`}
                 cx={end.x}
                 cy={end.y}
-                r="4"
+                r="3.5"
                 fill={AXIS_COLORS[i]}
                 opacity="0.7"
               />
             ))}
 
+            {/* Triangle faces (depth illusion) */}
+            {triangles.map((tri, i) => (
+              <path
+                key={`tri-${i}`}
+                d={tri.path}
+                fill={tri.color}
+              />
+            ))}
+
             {/* Data shape fill */}
-            <path d={dataPath} fill="rgba(91,157,245,0.2)" />
+            <path d={dataPath} fill="rgba(91,157,245,0.18)" />
 
             {/* Data shape outline */}
             <path
               d={dataPath}
               fill="none"
-              stroke="rgba(91,157,245,0.8)"
-              strokeWidth="2.5"
+              stroke="rgba(91,157,245,0.75)"
+              strokeWidth="2"
             />
 
-            {/* Data nodes */}
-            {dataPoints.map((p, i) => (
-              <g key={`node-${i}`}>
-                <circle
-                  cx={p.x}
-                  cy={p.y}
-                  r="8"
-                  fill={AXIS_COLORS[i]}
-                  opacity="0.25"
-                />
-                <circle
-                  cx={p.x}
-                  cy={p.y}
-                  r="5"
-                  fill={AXIS_COLORS[i]}
-                  opacity="0.85"
-                />
-              </g>
-            ))}
+            {/* Data nodes (depth-sorted) */}
+            {sortedZ.map(({ i: idx, z }) => {
+              const dp = dataEnds[idx];
+              const depthAlpha = 0.5 + (1 + z) * 0.25;
+              const nodeR = 3 + (dp.f ?? 1) * 2;
+              return (
+                <g key={`node-${idx}`}>
+                  <circle
+                    cx={dp.x}
+                    cy={dp.y}
+                    r={nodeR + 3}
+                    fill={hexRGBA(AXIS_COLORS[idx], depthAlpha * 0.25)}
+                  />
+                  <circle
+                    cx={dp.x}
+                    cy={dp.y}
+                    r={nodeR}
+                    fill={hexRGBA(AXIS_COLORS[idx], depthAlpha)}
+                  />
+                </g>
+              );
+            })}
 
             {/* Center dot */}
-            <circle cx={CX} cy={CY} r="3" fill="rgba(200,220,255,0.3)" />
+            <circle cx={CX} cy={CY} r="2.5" fill="rgba(200,220,255,0.25)" />
           </svg>
 
-          {/* Axis labels (positioned with absolute divs for text rendering) */}
+          {/* Axis labels */}
           {AXIS_KEYS.map((key, i) => {
-            const pos = labelPositions[i];
+            const le = labelEnds[i];
+            const lz = zOrder[i].z;
+            const labAlpha = Math.min(1, 0.5 + (1 + lz) * 0.25);
             return (
               <div
                 key={`label-${i}`}
                 style={{
                   position: "absolute",
-                  left: `${pos.x}px`,
-                  top: `${pos.y}px`,
+                  left: `${le.x}px`,
+                  top: `${le.y}px`,
                   transform: "translate(-50%, -50%)",
-                  color: AXIS_COLORS[i],
-                  fontSize: "14px",
+                  color: hexRGBA("#C8DCFF", labAlpha),
+                  fontSize: "13px",
                   fontWeight: 700,
-                  letterSpacing: "0.5px",
-                  textShadow: "0 0 8px rgba(0,0,0,0.8)",
+                  letterSpacing: "0.3px",
+                  textShadow: "0 0 10px rgba(0,0,0,0.9)",
                   display: "flex",
                 }}
               >
@@ -256,13 +344,13 @@ export default async function OGImage({
         {/* Right side — Branding & info */}
         <div
           style={{
-            width: "360px",
+            width: "520px",
             height: "630px",
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
             alignItems: "flex-start",
-            padding: "0 40px",
+            padding: "0 60px 0 40px",
           }}
         >
           {/* Logo / Title */}
@@ -270,27 +358,27 @@ export default async function OGImage({
             style={{
               display: "flex",
               alignItems: "center",
-              marginBottom: "24px",
+              marginBottom: "28px",
             }}
           >
             <div
               style={{
-                width: "40px",
-                height: "40px",
-                borderRadius: "10px",
+                width: "44px",
+                height: "44px",
+                borderRadius: "12px",
                 background: "linear-gradient(135deg, #818CF8, #6366F1)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                marginRight: "12px",
-                fontSize: "22px",
+                marginRight: "14px",
+                fontSize: "24px",
               }}
             >
               🧭
             </div>
             <div
               style={{
-                fontSize: "24px",
+                fontSize: "28px",
                 fontWeight: 800,
                 color: "#E2E8F0",
                 display: "flex",
@@ -303,11 +391,13 @@ export default async function OGImage({
           {/* User name */}
           <div
             style={{
-              fontSize: "20px",
+              fontSize: "22px",
               fontWeight: 600,
               color: "#CBD5E1",
-              marginBottom: "12px",
+              marginBottom: "8px",
               display: "flex",
+              direction: titleIsRTL ? "rtl" : "ltr",
+              width: "100%",
             }}
           >
             {title}
@@ -316,22 +406,34 @@ export default async function OGImage({
           {/* Description */}
           <div
             style={{
-              fontSize: "15px",
+              fontSize: "16px",
               color: "#94A3B8",
               lineHeight: "1.5",
+              marginBottom: "8px",
               display: "flex",
             }}
           >
-            Political identity across 8 dimensions
+            View user's civic compass
           </div>
+
+          {/* Separator */}
+          <div
+            style={{
+              width: "60px",
+              height: "2px",
+              background: "linear-gradient(90deg, #818CF8, #6366F1)",
+              borderRadius: "1px",
+              marginBottom: "24px",
+              display: "flex",
+            }}
+          />
 
           {/* Dimension bars */}
           <div
             style={{
               display: "flex",
               flexDirection: "column",
-              gap: "6px",
-              marginTop: "28px",
+              gap: "8px",
               width: "100%",
             }}
           >
@@ -341,13 +443,13 @@ export default async function OGImage({
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: "8px",
+                  gap: "10px",
                 }}
               >
                 <div
                   style={{
-                    width: "70px",
-                    fontSize: "10px",
+                    width: "90px",
+                    fontSize: "12px",
                     fontWeight: 600,
                     color: AXIS_COLORS[i],
                     display: "flex",
@@ -359,23 +461,35 @@ export default async function OGImage({
                 <div
                   style={{
                     flex: 1,
-                    height: "6px",
-                    borderRadius: "3px",
-                    background: "rgba(255,255,255,0.08)",
+                    height: "8px",
+                    borderRadius: "4px",
+                    background: "rgba(255,255,255,0.06)",
                     display: "flex",
                     overflow: "hidden",
                   }}
                 >
                   <div
                     style={{
-                      width: `${values[i] * 100}%`,
+                      width: `${Math.max(values[i] * 100, 2)}%`,
                       height: "100%",
-                      borderRadius: "3px",
+                      borderRadius: "4px",
                       background: AXIS_COLORS[i],
-                      opacity: 0.8,
+                      opacity: 0.85,
                       display: "flex",
                     }}
                   />
+                </div>
+                <div
+                  style={{
+                    width: "36px",
+                    fontSize: "11px",
+                    fontWeight: 500,
+                    color: "#64748B",
+                    display: "flex",
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  {Math.round(values[i] * 100)}%
                 </div>
               </div>
             ))}
@@ -384,7 +498,7 @@ export default async function OGImage({
           {/* URL watermark */}
           <div
             style={{
-              fontSize: "12px",
+              fontSize: "13px",
               color: "#475569",
               marginTop: "32px",
               display: "flex",

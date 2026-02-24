@@ -14,7 +14,7 @@ export async function generateMetadata({
   const { id: userId } = await params;
 
   let title = "Civic Compass Profile";
-  let description = "Political identity across 8 dimensions";
+  let description = "View user's civic compass";
 
   try {
     const res = await fetch(`${API_BASE}/compass/profile/${userId}`, {
@@ -24,7 +24,7 @@ export async function generateMetadata({
       const data = await res.json();
       const name = data.displayName || data.wallet || "Anonymous";
       title = `${name} — Civic Compass`;
-      description = `View ${name}'s political compass across 8 dimensions`;
+      description = `View ${name}'s civic compass`;
     }
   } catch {
     // Use defaults
