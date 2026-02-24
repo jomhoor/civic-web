@@ -227,6 +227,8 @@ export default async function OGImage({
 
   const title = displayName || wallet || "Anonymous";
   const titleIsRTL = isRTL(title);
+  // Wrap RTL text with Unicode bidi isolate characters so Satori renders correct word order
+  const displayTitle = titleIsRTL ? `\u2067${title}\u2069` : title;
 
   return new ImageResponse(
     (
@@ -430,7 +432,7 @@ export default async function OGImage({
               width: "100%",
             }}
           >
-            {title}
+            {displayTitle}
           </div>
 
           {/* Description */}
