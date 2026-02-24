@@ -264,6 +264,11 @@ function DashboardContent() {
         setHistory(historyData ?? []);
         setQuestionnaireProgress(progressData ?? []);
 
+        // First-time wallet users: show questionnaire tab if no questionnaire completed yet
+        if (!isGuest && progressData && !progressData.some((q: QuestionnaireProgress) => q.completed)) {
+          setTab("session");
+        }
+
         // Network features — skip for guest users
         if (!isGuest) {
           const [walletData, freqData, matchSettingsData, incomingData, connectionsData, pokesData, pokeCountData, chatThreadsData, unseenMsgData] = await Promise.all([
