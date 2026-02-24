@@ -102,12 +102,41 @@ function isRTL(text: string): boolean {
   return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
 }
 
+/**
+ * Derive classic Political Compass 2-axis from 8 dimensions.
+ * X = economy (-1 left, +1 right)
+ * Y = inverted average of governance, civil_liberties, society, justice
+ *     +1 = authoritarian (top), -1 = libertarian (bottom)
+ */
+function toPoliticalCompass(dims: Record<string, number>) {
+  const economic = dims.economy ?? 0;
+  const social =
+    -((dims.governance ?? 0) +
+      (dims.civil_liberties ?? 0) +
+      (dims.society ?? 0) +
+      (dims.justice ?? 0)) / 4;
+  return { economic, social };
+}
+
+/* ── Font loader (Vazirmatn for Persian, fetched once at edge) ── */
+const vazirmatnPromise = fetch(
+  "https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/fonts/ttf/Vazirmatn-Bold.ttf"
+).then((res) => res.arrayBuffer());
+
 export default async function OGImage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id: userId } = await params;
+
+  // Load Persian font
+  let vazirmatnData: ArrayBuffer | null = null;
+  try {
+    vazirmatnData = await vazirmatnPromise;
+  } catch {
+    // Fallback without Persian font
+  }
 
   // Fetch compass data from backend
   let dimensions: Record<string, number> = {};
@@ -210,7 +239,7 @@ export default async function OGImage({
           alignItems: "center",
           justifyContent: "center",
           background: "#111111",
-          fontFamily: '"Inter", "Helvetica", sans-serif',
+          fontFamily: '"Inter", "Vazirmatn", "Helvetica", sans-serif',
         }}
       >
         {/* Left side — 3D Compass */}
@@ -397,6 +426,7 @@ export default async function OGImage({
               marginBottom: "8px",
               display: "flex",
               direction: titleIsRTL ? "rtl" : "ltr",
+              fontFamily: titleIsRTL ? "Vazirmatn" : "Inter",
               width: "100%",
             }}
           >
@@ -423,77 +453,92 @@ export default async function OGImage({
               height: "2px",
               background: "linear-gradient(90deg, #818CF8, #6366F1)",
               borderRadius: "1px",
-              marginBottom: "24px",
+              marginBottom: "16px",
               display: "flex",
             }}
           />
 
-          {/* Dimension bars */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "8px",
-              width: "100%",
-            }}
-          >
-            {AXIS_KEYS.map((key, i) => (
-              <div
-                key={key}
-                style={{
+          {/* 2D Political Compass Chart */}
+          {(() => {
+            const { economic, social } = toPoliticalCompass(dimensions);
+            const S2 = 320; // chart size
+            const P = 40;   // padding
+            const G = S2 - P * 2; // grid area
+            const C = S2 / 2;     // center
+            const dotX2 = C + (economic * G) / 2;
+            const dotY2 = C - (social * G) / 2; // invert: authoritarian at top
+            const qAlpha = 0.15;
+
+            return (
+              <div style={{ display: "flex", position: "relative", width: `${S2}px`, height: `${S2}px` }}>
+                <svg width={S2} height={S2} viewBox={`0 0 ${S2} ${S2}`}>
+                  {/* Quadrant backgrounds */}
+                  <rect x={P} y={P} width={G / 2} height={G / 2} fill={`rgba(232,116,97,${qAlpha})`} />
+                  <rect x={C} y={P} width={G / 2} height={G / 2} fill={`rgba(96,165,250,${qAlpha})`} />
+                  <rect x={P} y={C} width={G / 2} height={G / 2} fill={`rgba(52,211,153,${qAlpha})`} />
+                  <rect x={C} y={C} width={G / 2} height={G / 2} fill={`rgba(167,139,250,${qAlpha})`} />
+
+                  {/* Grid lines */}
+                  {[-0.5, 0.5].map((v) => (
+                    <g key={v}>
+                      <line x1={C + (v * G) / 2} y1={P} x2={C + (v * G) / 2} y2={S2 - P} stroke="rgba(255,255,255,0.1)" strokeWidth="0.5" />
+                      <line x1={P} y1={C - (v * G) / 2} x2={S2 - P} y2={C - (v * G) / 2} stroke="rgba(255,255,255,0.1)" strokeWidth="0.5" />
+                    </g>
+                  ))}
+
+                  {/* Main axes */}
+                  <line x1={C} y1={P} x2={C} y2={S2 - P} stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+                  <line x1={P} y1={C} x2={S2 - P} y2={C} stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+
+                  {/* User dot */}
+                  <circle cx={dotX2} cy={dotY2} r="10" fill="#818CF8" opacity="0.3" />
+                  <circle cx={dotX2} cy={dotY2} r="6" fill="#818CF8" />
+                  <circle cx={dotX2} cy={dotY2} r="2.5" fill="#1a1a1a" opacity="0.8" />
+                </svg>
+
+                {/* Axis labels */}
+                <div style={{ position: "absolute", top: `${P - 18}px`, left: "50%", transform: "translateX(-50%)", fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.6)", display: "flex" }}>
+                  Authoritarian
+                </div>
+                <div style={{ position: "absolute", bottom: `${P - 18}px`, left: "50%", transform: "translateX(-50%)", fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.6)", display: "flex" }}>
+                  Libertarian
+                </div>
+                <div style={{ position: "absolute", left: `${P - 36}px`, top: "50%", transform: "translateY(-50%)", fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.6)", display: "flex" }}>
+                  Left
+                </div>
+                <div style={{ position: "absolute", right: `${P - 36}px`, top: "50%", transform: "translateY(-50%)", fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.6)", display: "flex" }}>
+                  Right
+                </div>
+
+                {/* Quadrant labels */}
+                <div style={{ position: "absolute", top: `${P + G * 0.12}px`, left: `${P + G * 0.12}px`, fontSize: "8px", fontWeight: 600, color: "rgba(255,255,255,0.25)", display: "flex" }}>
+                  Auth Left
+                </div>
+                <div style={{ position: "absolute", top: `${P + G * 0.12}px`, right: `${P + G * 0.12}px`, fontSize: "8px", fontWeight: 600, color: "rgba(255,255,255,0.25)", display: "flex" }}>
+                  Auth Right
+                </div>
+                <div style={{ position: "absolute", bottom: `${P + G * 0.12}px`, left: `${P + G * 0.12}px`, fontSize: "8px", fontWeight: 600, color: "rgba(255,255,255,0.25)", display: "flex" }}>
+                  Lib Left
+                </div>
+                <div style={{ position: "absolute", bottom: `${P + G * 0.12}px`, right: `${P + G * 0.12}px`, fontSize: "8px", fontWeight: 600, color: "rgba(255,255,255,0.25)", display: "flex" }}>
+                  Lib Right
+                </div>
+
+                {/* Coordinate label near dot */}
+                <div style={{
+                  position: "absolute",
+                  left: `${dotX2 + 14}px`,
+                  top: `${dotY2 - 16}px`,
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  color: "#818CF8",
                   display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                }}
-              >
-                <div
-                  style={{
-                    width: "90px",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: AXIS_COLORS[i],
-                    display: "flex",
-                    flexShrink: 0,
-                  }}
-                >
-                  {AXIS_LABELS[key]}
-                </div>
-                <div
-                  style={{
-                    flex: 1,
-                    height: "8px",
-                    borderRadius: "4px",
-                    background: "rgba(255,255,255,0.06)",
-                    display: "flex",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: `${Math.max(values[i] * 100, 2)}%`,
-                      height: "100%",
-                      borderRadius: "4px",
-                      background: AXIS_COLORS[i],
-                      opacity: 0.85,
-                      display: "flex",
-                    }}
-                  />
-                </div>
-                <div
-                  style={{
-                    width: "36px",
-                    fontSize: "11px",
-                    fontWeight: 500,
-                    color: "#64748B",
-                    display: "flex",
-                    justifyContent: "flex-end",
-                  }}
-                >
-                  {Math.round(values[i] * 100)}%
+                }}>
+                  ({economic.toFixed(2)}, {social.toFixed(2)})
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })()}
 
           {/* URL watermark */}
           <div
@@ -511,6 +556,18 @@ export default async function OGImage({
     ),
     {
       ...size,
+      fonts: [
+        ...(vazirmatnData
+          ? [
+              {
+                name: "Vazirmatn",
+                data: vazirmatnData,
+                weight: 700 as const,
+                style: "normal" as const,
+              },
+            ]
+          : []),
+      ],
     }
   );
 }
