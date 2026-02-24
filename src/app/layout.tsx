@@ -11,6 +11,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://compass.jomhoor.org"
+  ),
   title: "Civic Compass",
   description: "Track your civic identity as it evolves",
 };
