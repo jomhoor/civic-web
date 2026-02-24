@@ -271,6 +271,18 @@ const en = {
   poke_from: "poked you",
   start_chat: "Start Chat",
 
+  // E2E Chat
+  tab_chat: "Chat",
+  chat_title: "Encrypted Messages",
+  chat_placeholder: "Type a message…",
+  send_message: "Send",
+  no_messages: "No messages yet. Say hello!",
+  no_chats: "No conversations yet. Poke someone to start chatting!",
+  chat_back: "All Chats",
+  chat_enable: "Enable Encrypted Chat",
+  chat_enable_desc: "Sign a message with your wallet to derive encryption keys. Your messages will be end-to-end encrypted.",
+  chat_signing: "Signing…",
+  unseen_messages: "new messages",
   unseen_pokes: "new pokes",
 
   // Welcome
@@ -545,6 +557,18 @@ const fa: typeof en = {
   poke_from: "شما را سقلمه زد",
   start_chat: "شروع گفتگو",
 
+  // E2E Chat
+  tab_chat: "گفتگو",
+  chat_title: "پیام‌های رمزنگاری‌شده",
+  chat_placeholder: "پیامی بنویسید…",
+  send_message: "ارسال",
+  no_messages: "هنوز پیامی نیست. سلام کنید!",
+  no_chats: "هنوز گفتگویی ندارید. کسی را سقلمه بزنید تا گفتگو شروع شود!",
+  chat_back: "همه گفتگوها",
+  chat_enable: "فعال‌سازی گفتگوی رمزنگاری‌شده",
+  chat_enable_desc: "یک پیام با کیف پول خود امضا کنید تا کلیدهای رمزنگاری ساخته شود. پیام‌های شما به صورت سرتاسر رمزنگاری می‌شوند.",
+  chat_signing: "در حال امضا…",
+  unseen_messages: "پیام جدید",
   unseen_pokes: "سقلمه جدید",
 
   // Welcome

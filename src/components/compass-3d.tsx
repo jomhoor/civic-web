@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, forwardRef, useImperativeHandle, useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { axisLabel } from "@/lib/i18n";
+import { generateProfileQR, QR_SIZE } from "@/lib/qr";
 
 /* ── Constants ── */
 const TAU = Math.PI * 2;
@@ -82,17 +83,49 @@ function project(
 }
 
 /* ── Component ── */
+export interface Compass3DHandle {
+  toDataURL: () => string | null;
+}
+
 interface Compass3DProps {
   dimensions: Record<string, number>;
   confidence: Record<string, number>;
+  userId?: string;
 }
 
-export function Compass3D({ dimensions, confidence }: Compass3DProps) {
+export const Compass3D = forwardRef<Compass3DHandle, Compass3DProps>(
+  function Compass3D({ dimensions, confidence, userId }, ref) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const angleY = useRef(0);
   const raf = useRef<number>(0);
   const language = useAppStore((s) => s.language);
+  const [qrImg, setQrImg] = useState<HTMLImageElement | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    toDataURL: () => canvasRef.current?.toDataURL("image/png") ?? null,
+  }));
+
+  // Detect theme for QR color
+  const isDark = typeof document !== "undefined"
+    ? document.documentElement.getAttribute("data-theme") !== "light"
+    : true;
+
+  // Pre-generate QR code image when userId or theme changes
+  useEffect(() => {
+    if (!userId) { setQrImg(null); return; }
+    let cancelled = false;
+    const qrOpts = isDark
+      ? { dark: "#ffffffCC", light: "#00000000" }
+      : { dark: "#1E3A6BCC", light: "#00000000" };
+    generateProfileQR(userId, qrOpts).then((dataUrl) => {
+      if (cancelled) return;
+      const img = new Image();
+      img.onload = () => { if (!cancelled) setQrImg(img); };
+      img.src = dataUrl;
+    });
+    return () => { cancelled = true; };
+  }, [userId, isDark]);
 
   // Normalize [-1,1] → [0,1]
   const values = AXIS_KEYS.map((k) => ((dimensions[k] ?? 0) + 1) / 2);
@@ -110,8 +143,10 @@ export function Compass3D({ dimensions, confidence }: Compass3DProps) {
 
     const rect = wrapper.getBoundingClientRect();
     const W = Math.min(rect.width, 520);
-    const H = Math.min(W, 420);
-    const dpr = window.devicePixelRatio || 1;
+    const baseH = Math.min(W, 420);
+    const qrExtra = qrImg ? QR_SIZE + 16 : 0;
+    const H = baseH + qrExtra;
+    const dpr = Math.max(window.devicePixelRatio || 1, 2);
 
     canvas.width = W * dpr;
     canvas.height = H * dpr;
@@ -120,14 +155,16 @@ export function Compass3D({ dimensions, confidence }: Compass3DProps) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const CX = W / 2;
-    const CY = H / 2;
-    const S = Math.min(W, H) * 0.32;
+    const CY = baseH / 2;
+    const S = Math.min(W, baseH) * 0.32;
 
     const isLight =
       document.documentElement.getAttribute("data-theme") === "light";
     const curVals = valuesRef.current;
 
-    ctx.clearRect(0, 0, W, H);
+    // Theme-adaptive background
+    ctx.fillStyle = isLight ? "#F5F7FA" : "#111111";
+    ctx.fillRect(0, 0, W, H);
     angleY.current += ROTATE_SPEED;
 
     // Pre-compute positions
@@ -165,9 +202,9 @@ export function Compass3D({ dimensions, confidence }: Compass3DProps) {
       }
       ctx.closePath();
       ctx.strokeStyle = isLight
-        ? "rgba(30,58,107,0.08)"
-        : "rgba(255,255,255,0.07)";
-      ctx.lineWidth = 0.8;
+        ? "rgba(30,58,107,0.15)"
+        : "rgba(200,220,255,0.15)";
+      ctx.lineWidth = 1;
       ctx.stroke();
     }
 
@@ -176,13 +213,13 @@ export function Compass3D({ dimensions, confidence }: Compass3DProps) {
       ctx.beginPath();
       ctx.moveTo(CX, CY);
       ctx.lineTo(axisEnds[k].x, axisEnds[k].y);
-      ctx.strokeStyle = hexRGBA(AXIS_COLORS[k], 0.25);
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = hexRGBA(AXIS_COLORS[k], 0.4);
+      ctx.lineWidth = 1.2;
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.arc(axisEnds[k].x, axisEnds[k].y, 2.5, 0, TAU);
-      ctx.fillStyle = hexRGBA(AXIS_COLORS[k], 0.5);
+      ctx.arc(axisEnds[k].x, axisEnds[k].y, 3, 0, TAU);
+      ctx.fillStyle = hexRGBA(AXIS_COLORS[k], 0.7);
       ctx.fill();
     }
 
@@ -193,7 +230,7 @@ export function Compass3D({ dimensions, confidence }: Compass3DProps) {
       else ctx.lineTo(dataEnds[m].x, dataEnds[m].y);
     }
     ctx.closePath();
-    ctx.fillStyle = "rgba(91,157,245,0.12)";
+    ctx.fillStyle = "rgba(91,157,245,0.2)";
     ctx.fill();
 
     // Data shape outline
@@ -203,10 +240,9 @@ export function Compass3D({ dimensions, confidence }: Compass3DProps) {
       else ctx.lineTo(dataEnds[m].x, dataEnds[m].y);
     }
     ctx.closePath();
-    ctx.strokeStyle = isLight
-      ? "rgba(91,157,245,0.6)"
-      : "rgba(91,157,245,0.55)";
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle =
+      "rgba(91,157,245,0.75)";
+    ctx.lineWidth = 2;
     ctx.stroke();
 
     // Inner triangles (depth illusion)
@@ -218,7 +254,7 @@ export function Compass3D({ dimensions, confidence }: Compass3DProps) {
       ctx.lineTo(dataEnds[t2].x, dataEnds[t2].y);
       ctx.closePath();
       const avgZ = (zOrder[t].z + zOrder[t2].z) / 2;
-      const faceAlpha = 0.04 + (1 + avgZ) * 0.04;
+      const faceAlpha = 0.06 + (1 + avgZ) * 0.06;
       ctx.fillStyle = hexRGBA(AXIS_COLORS[t], faceAlpha);
       ctx.fill();
     }
@@ -244,12 +280,12 @@ export function Compass3D({ dimensions, confidence }: Compass3DProps) {
     // Labels
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    const labelSize = Math.max(9, Math.round(S * 0.06));
-    ctx.font = `600 ${labelSize}px "Inter", sans-serif`;
+    const labelSize = Math.max(10, Math.round(S * 0.07));
+    ctx.font = `700 ${labelSize}px "Inter", sans-serif`;
 
     for (const { i: lIdx, z: lz } of zOrder) {
       const le = axisEnds[lIdx];
-      let labAlpha = 0.35 + (1 + lz) * 0.32;
+      let labAlpha = 0.5 + (1 + lz) * 0.25;
       if (labAlpha > 1) labAlpha = 1;
 
       const ldx = le.x - CX;
@@ -264,7 +300,7 @@ export function Compass3D({ dimensions, confidence }: Compass3DProps) {
 
       ctx.fillStyle = isLight
         ? hexRGBA("#1E3A6B", labAlpha)
-        : hexRGBA("#ffffff", labAlpha);
+        : hexRGBA("#C8DCFF", labAlpha);
 
       for (let ll = 0; ll < lines.length; ll++) {
         ctx.fillText(
@@ -278,9 +314,8 @@ export function Compass3D({ dimensions, confidence }: Compass3DProps) {
       if (confCount < 4) {
         const confSize = Math.max(7, Math.round(S * 0.045));
         ctx.font = `500 ${confSize}px "Inter", sans-serif`;
-        ctx.fillStyle = isLight
-          ? hexRGBA("#D97706", labAlpha)
-          : hexRGBA("#F9C452", labAlpha * 0.7);
+        ctx.fillStyle =
+          hexRGBA("#D97706", labAlpha);
         ctx.fillText(
           confCount < 2 ? "?" : "~",
           labX,
@@ -293,11 +328,18 @@ export function Compass3D({ dimensions, confidence }: Compass3DProps) {
     // Center dot
     ctx.beginPath();
     ctx.arc(CX, CY, 2, 0, TAU);
-    ctx.fillStyle = isLight ? "rgba(30,58,107,0.25)" : "rgba(255,255,255,0.2)";
+    ctx.fillStyle = isLight ? "rgba(30,58,107,0.25)" : "rgba(200,220,255,0.25)";
     ctx.fill();
 
+    // QR code watermark (centered below compass)
+    if (qrImg) {
+      ctx.globalAlpha = 0.6;
+      ctx.drawImage(qrImg, (W - QR_SIZE) / 2, baseH + 4, QR_SIZE, QR_SIZE);
+      ctx.globalAlpha = 1;
+    }
+
     raf.current = requestAnimationFrame(draw);
-  }, [axes3D, confidence, language]);
+  }, [axes3D, confidence, language, qrImg]);
 
   useEffect(() => {
     raf.current = requestAnimationFrame(draw);
@@ -305,7 +347,7 @@ export function Compass3D({ dimensions, confidence }: Compass3DProps) {
   }, [draw]);
 
   return (
-    <div ref={wrapperRef} className="card p-3 sm:p-6 w-full max-w-lg mx-auto">
+    <div ref={wrapperRef} className="w-full max-w-lg mx-auto">
       <canvas
         ref={canvasRef}
         className="mx-auto block"
@@ -313,4 +355,4 @@ export function Compass3D({ dimensions, confidence }: Compass3DProps) {
       />
     </div>
   );
-}
+});

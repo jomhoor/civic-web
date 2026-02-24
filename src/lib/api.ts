@@ -265,3 +265,41 @@ export async function getPokeStatus(targetUserId: string) {
   const { data } = await api.get(`/poke/status/${targetUserId}`);
   return data;
 }
+
+// --- E2E Encrypted Chat ---
+export async function setChatPublicKey(publicKey: string) {
+  const { data } = await api.post("/chat/public-key", { publicKey });
+  return data;
+}
+
+export async function getChatPublicKey(userId: string) {
+  const { data } = await api.get(`/chat/public-key/${userId}`);
+  return data;
+}
+
+export async function getChatThreads() {
+  const { data } = await api.get("/chat/threads");
+  return data;
+}
+
+export async function getUnseenMessageCount() {
+  const { data } = await api.get("/chat/unseen-count");
+  return data;
+}
+
+export async function getConversation(otherUserId: string, cursor?: string) {
+  const params: Record<string, string> = {};
+  if (cursor) params.cursor = cursor;
+  const { data } = await api.get(`/chat/${otherUserId}`, { params });
+  return data;
+}
+
+export async function sendEncryptedMessage(receiverId: string, ciphertext: string, nonce: string) {
+  const { data } = await api.post(`/chat/${receiverId}`, { ciphertext, nonce });
+  return data;
+}
+
+export async function markChatSeen(otherUserId: string) {
+  const { data } = await api.post(`/chat/${otherUserId}/mark-seen`);
+  return data;
+}

@@ -1,12 +1,14 @@
 "use client";
 
+import { Compass3D } from "@/components/compass-3d";
+import type { Compass3DHandle } from "@/components/compass-3d";
 import { PageNavBar } from "@/components/page-nav-bar";
 import { PoliticalCompassChart } from "@/components/political-compass-chart";
+import type { CompassChartHandle } from "@/components/political-compass-chart";
 import { getPokeStatus, getPublicProfile, sendPoke } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useAppStore } from "@/lib/store";
-import { toPng } from "html-to-image";
-import { ArrowLeft, Check, Copy, Download, ExternalLink, MessageCircle, Share2, Zap } from "lucide-react";
+import { ArrowLeft, Check, Copy, Download, Lock, MessageCircle, Share2, Zap } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -31,7 +33,9 @@ export default function ProfilePage() {
   const [copied, setCopied] = useState(false);
   const [pokeState, setPokeState] = useState<{ hasPoked: boolean; hasBeenPoked: boolean; mutual: boolean; walletAddress?: string } | null>(null);
   const [pokeSending, setPokeSending] = useState(false);
-  const chartRef = useRef<HTMLDivElement>(null);
+  const [compassView, setCompassView] = useState<"2d" | "3d">("3d");
+  const chartRef = useRef<CompassChartHandle>(null);
+  const compass3DRef = useRef<Compass3DHandle>(null);
   const currentUser = useAppStore((s) => s.user);
   const isOwnProfile = currentUser?.id === userId;
 
@@ -57,18 +61,14 @@ export default function ProfilePage() {
   }, [userId, currentUser]);
 
   const handleDownload = useCallback(async () => {
-    if (!chartRef.current) return;
     try {
-      const el = chartRef.current;
-      const dataUrl = await toPng(el, {
-        width: el.offsetWidth * 2,
-        height: el.offsetHeight * 2,
-        canvasWidth: el.offsetWidth * 2,
-        canvasHeight: el.offsetHeight * 2,
-        pixelRatio: 2,
-        backgroundColor: "#111",
-        style: { transform: "scale(2)", transformOrigin: "top left" },
-      });
+      let dataUrl: string | null = null;
+      if (compassView === "3d") {
+        dataUrl = compass3DRef.current?.toDataURL() ?? null;
+      } else {
+        dataUrl = await chartRef.current?.toDataURL() ?? null;
+      }
+      if (!dataUrl) return;
       const link = document.createElement("a");
       link.download = `civic-compass-${userId.slice(0, 8)}.png`;
       link.href = dataUrl;
@@ -76,7 +76,7 @@ export default function ProfilePage() {
     } catch (err) {
       console.error("Failed to download:", err);
     }
-  }, [userId]);
+  }, [userId, compassView]);
 
   const handleShare = useCallback(async () => {
     const url = window.location.href;
@@ -180,32 +180,66 @@ export default function ProfilePage() {
           </p>
         </div>
 
-        {/* Compass chart */}
-        <PoliticalCompassChart
-          ref={chartRef}
-          dimensions={profile.dimensions}
-          confidence={profile.confidence}
-          userId={profile.id}
-        />
+        {/* Compass view toggle + chart */}
+        <div className="space-y-3">
+          <div
+            className="flex gap-1 rounded-full p-1 w-fit mx-auto"
+            style={{ background: "var(--component-primary)", border: "1px solid var(--border-color)" }}
+          >
+            <button
+              onClick={() => setCompassView("2d")}
+              className="px-4 py-1 rounded-full text-xs font-semibold transition-all"
+              style={{
+                background: compassView === "2d" ? "var(--accent-gradient)" : "transparent",
+                color: compassView === "2d" ? "#111" : "var(--text-secondary)",
+              }}
+            >
+              {t("view_2d", language)}
+            </button>
+            <button
+              onClick={() => setCompassView("3d")}
+              className="px-4 py-1 rounded-full text-xs font-semibold transition-all"
+              style={{
+                background: compassView === "3d" ? "var(--accent-gradient)" : "transparent",
+                color: compassView === "3d" ? "#111" : "var(--text-secondary)",
+              }}
+            >
+              {t("view_3d", language)}
+            </button>
+          </div>
+
+          {compassView === "2d" ? (
+            <PoliticalCompassChart
+              ref={chartRef}
+              dimensions={profile.dimensions}
+              confidence={profile.confidence}
+              userId={profile.id}
+            />
+          ) : (
+            <Compass3D
+              ref={compass3DRef}
+              dimensions={profile.dimensions}
+              confidence={profile.confidence}
+              userId={profile.id}
+            />
+          )}
+        </div>
 
         {/* Poke / Chat action */}
         {currentUser && !isOwnProfile && (
           <div className="flex items-center justify-center gap-2">
-            {pokeState?.mutual && pokeState.walletAddress ? (
-              <a
-                href={`https://chat.blockscan.com/eth/${pokeState.walletAddress}`}
-                target="_blank"
-                rel="noopener noreferrer"
+            {pokeState?.mutual ? (
+              <button
+                onClick={() => router.push("/dashboard?tab=chat&user=" + userId)}
                 className="flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold transition-all"
                 style={{
                   background: "var(--accent-gradient)",
                   color: "#111",
                 }}
               >
-                <MessageCircle size={16} strokeWidth={1.5} />
-                {t("chat_blockscan", language)}
-                <ExternalLink size={14} strokeWidth={1.5} />
-              </a>
+                <Lock size={16} strokeWidth={1.5} />
+                {t("start_chat", language)}
+              </button>
             ) : (
               <button
                 onClick={handlePoke}

@@ -1,6 +1,7 @@
 "use client";
 
 import { SettingsBar } from "@/components/settings-bar";
+import { clearChatKeys } from "@/lib/chat-crypto";
 import { t } from "@/lib/i18n";
 import { useAppStore } from "@/lib/store";
 import { LayoutDashboard, LogOut } from "lucide-react";
@@ -25,6 +26,7 @@ export function PageNavBar({ showHome = true, className = "" }: PageNavBarProps)
 
   function handleDisconnect() {
     disconnectWallet();
+    clearChatKeys();
     useAppStore.getState().logout();
     router.push("/");
   }

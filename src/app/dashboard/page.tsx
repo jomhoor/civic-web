@@ -1,15 +1,20 @@
 "use client";
 
 import { Compass3D } from "@/components/compass-3d";
+import type { Compass3DHandle } from "@/components/compass-3d";
 import { PageNavBar } from "@/components/page-nav-bar";
 import { PoliticalCompassChart } from "@/components/political-compass-chart";
+import type { CompassChartHandle } from "@/components/political-compass-chart";
 import { QuestionCard } from "@/components/question-card";
 import { QuestionnaireIcon } from "@/components/questionnaire-icon";
 import {
     cancelConnection,
     diffSnapshots,
+    getChatPublicKey,
+    getChatThreads,
     getCompass,
     getConnections,
+    getConversation,
     getFrequencyPreference,
     getHistory,
     getIncomingRequests,
@@ -18,26 +23,42 @@ import {
     getNextQuestions,
     getQuestionnaireProgress,
     getReceivedPokes,
+    getUnseenMessageCount,
     getUnseenPokeCount,
     getWallet,
+    markChatSeen,
     markPokesSeen,
     resetQuestionnaireResponses,
     respondToConnection,
     saveSnapshot,
     sendConnectionRequest,
+    sendEncryptedMessage,
     sendPoke,
+    setChatPublicKey,
     setFrequencyPreference,
     submitResponses,
     updateMatchSettings,
 } from "@/lib/api";
+import {
+    clearChatKeys,
+    computeSharedSecret,
+    decryptMessage,
+    deriveChatKeyPair,
+    encryptMessage,
+    getCachedKeyPair,
+    getChatSignMessage,
+    getPublicKeyBase64,
+    isChatReady,
+} from "@/lib/chat-crypto";
 import { AXIS_KEYS, axisLabel, t } from "@/lib/i18n";
 import { useAppStore } from "@/lib/store";
-import { toPng } from "html-to-image";
-import { ArrowDownRight, ArrowLeft, ArrowUpRight, BarChart3, BookOpen, Check, CircleCheckBig, Clock, Download, ExternalLink, Eye, EyeOff, GitCompare, Link, Loader2, MessageCircle, MessageSquare, Minus, Puzzle, RotateCcw, Scan, Share2, Shield, Swords, UserPlus, Users, X, Zap } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
 
-type Tab = "compass" | "session" | "history" | "community" | "wallet";
+import { ArrowDownRight, ArrowLeft, ArrowUpRight, BarChart3, BookOpen, Check, CircleCheckBig, Clock, Download, ExternalLink, Eye, EyeOff, GitCompare, Link, Loader2, Lock, MessageCircle, MessageSquare, Minus, Puzzle, RotateCcw, Scan, Send, Share2, Shield, Swords, UserPlus, Users, X, Zap } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useSignMessage } from "wagmi";
+
+type Tab = "compass" | "session" | "history" | "community" | "chat" | "wallet";
 
 interface Snapshot {
   id: string;
@@ -123,13 +144,23 @@ interface Connection {
 type MatchMode = "mirror" | "challenger" | "complement";
 
 export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg-primary)" }}><div className="animate-pulse text-sm" style={{ color: "var(--text-muted)" }}>Loading…</div></div>}>
+      <DashboardContent />
+    </Suspense>
+  );
+}
+
+function DashboardContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
   const [tab, setTab] = useState<Tab>("compass");
   const [compassView, setCompassView] = useState<"2d" | "3d">("2d");
   const [showUserId, setShowUserId] = useState(false);
-  const compassChartRef = useRef<HTMLDivElement>(null);
+  const compassChartRef = useRef<CompassChartHandle>(null);
+  const compass3DRef = useRef<Compass3DHandle>(null);
   const [compass, setCompass] = useState<{
     dimensions: Record<string, number>;
     confidence: Record<string, number>;
@@ -188,6 +219,33 @@ export default function DashboardPage() {
   const [selectedQuestionnaire, setSelectedQuestionnaire] = useState<QuestionnaireProgress | null>(null);
   const [questionnaireProgress, setQuestionnaireProgress] = useState<QuestionnaireProgress[]>([]);
 
+  // Chat state
+  const { signMessageAsync } = useSignMessage();
+  const [chatReady, setChatReady] = useState(isChatReady());
+  const [chatSigning, setChatSigning] = useState(false);
+  const [chatThreads, setChatThreads] = useState<{
+    userId: string;
+    displayName: string | null;
+    chatPublicKey: string | null;
+    lastMessageAt: string | null;
+    unseenCount: number;
+  }[]>([]);
+  const [unseenMessageCount, setUnseenMessageCount] = useState(0);
+  const [activeChatUser, setActiveChatUser] = useState<string | null>(null);
+  const [activeChatPublicKey, setActiveChatPublicKey] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<{
+    id: string;
+    senderId: string;
+    ciphertext: string;
+    nonce: string;
+    createdAt: string;
+    plaintext?: string | null;
+  }[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatSending, setChatSending] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!user) {
       router.push("/connect");
@@ -196,7 +254,7 @@ export default function DashboardPage() {
 
     async function load() {
       try {
-        const [compassData, historyData, walletData, freqData, matchSettingsData, incomingData, connectionsData, progressData, pokesData, pokeCountData] = await Promise.all([
+        const [compassData, historyData, walletData, freqData, matchSettingsData, incomingData, connectionsData, progressData, pokesData, pokeCountData, chatThreadsData, unseenMsgData] = await Promise.all([
           getCompass(user!.id),
           getHistory(user!.id),
           getWallet(user!.id).catch(() => null),
@@ -207,6 +265,8 @@ export default function DashboardPage() {
           getQuestionnaireProgress().catch(() => []),
           getReceivedPokes().catch(() => []),
           getUnseenPokeCount().catch(() => ({ count: 0 })),
+          getChatThreads().catch(() => []),
+          getUnseenMessageCount().catch(() => ({ count: 0 })),
         ]);
         setCompass(compassData);
         setHistory(historyData);
@@ -224,6 +284,8 @@ export default function DashboardPage() {
         setQuestionnaireProgress(progressData ?? []);
         setReceivedPokes(pokesData ?? []);
         setUnseenPokeCount(pokeCountData?.count ?? 0);
+        setChatThreads(chatThreadsData ?? []);
+        setUnseenMessageCount(unseenMsgData?.count ?? 0);
       } catch (err) {
         console.error("Failed to load dashboard data:", err);
       }
@@ -231,6 +293,124 @@ export default function DashboardPage() {
 
     load();
   }, [user, router]);
+
+  // ─── E2E Chat helpers ───────────────────────────────────────
+
+  /** Enable chat by signing a message to derive encryption keys */
+  const enableChat = useCallback(async () => {
+    if (chatSigning || chatReady) return;
+    setChatSigning(true);
+    try {
+      const sig = await signMessageAsync({ message: getChatSignMessage() });
+      const kp = await deriveChatKeyPair(sig);
+      // Upload public key to server
+      const pubB64 = getPublicKeyBase64();
+      if (pubB64) {
+        await setChatPublicKey(pubB64);
+      }
+      setChatReady(true);
+      // Re-fetch threads now that we can decrypt
+      const threads = await getChatThreads().catch(() => []);
+      setChatThreads(threads ?? []);
+    } catch (err) {
+      console.error("Failed to enable chat:", err);
+    } finally {
+      setChatSigning(false);
+    }
+  }, [chatSigning, chatReady, signMessageAsync]);
+
+  /** Load a conversation with a user and decrypt messages */
+  const loadConversation = useCallback(async (otherUserId: string) => {
+    if (!chatReady) return;
+    setChatLoading(true);
+    setActiveChatUser(otherUserId);
+    setChatMessages([]);
+    try {
+      // Fetch their public key
+      const { publicKey } = await getChatPublicKey(otherUserId);
+      setActiveChatPublicKey(publicKey);
+
+      if (!publicKey) {
+        setChatLoading(false);
+        return; // Other user hasn't enabled chat yet
+      }
+
+      // Compute shared secret
+      const shared = computeSharedSecret(publicKey);
+
+      // Fetch messages
+      const { messages } = await getConversation(otherUserId);
+      const decrypted = messages.map((m: { id: string; senderId: string; ciphertext: string; nonce: string; createdAt: string }) => ({
+        ...m,
+        plaintext: decryptMessage(shared, m.ciphertext, m.nonce),
+      }));
+      setChatMessages(decrypted);
+
+      // Mark seen
+      await markChatSeen(otherUserId).catch(() => {});
+      // Refresh unseen count
+      const { count } = await getUnseenMessageCount().catch(() => ({ count: 0 }));
+      setUnseenMessageCount(count);
+    } catch (err) {
+      console.error("Failed to load conversation:", err);
+    } finally {
+      setChatLoading(false);
+    }
+  }, [chatReady]);
+
+  /** Send an encrypted message */
+  const handleSendMessage = useCallback(async () => {
+    if (!activeChatUser || !activeChatPublicKey || !chatInput.trim() || chatSending || !chatReady) return;
+    setChatSending(true);
+    try {
+      const shared = computeSharedSecret(activeChatPublicKey);
+      const { ciphertext, nonce } = encryptMessage(shared, chatInput.trim());
+      const result = await sendEncryptedMessage(activeChatUser, ciphertext, nonce);
+
+      // Add to local messages (already decrypted since we just sent it)
+      setChatMessages((prev) => [...prev, {
+        id: result.id,
+        senderId: user!.id,
+        ciphertext,
+        nonce,
+        createdAt: result.createdAt,
+        plaintext: chatInput.trim(),
+      }]);
+      setChatInput("");
+    } catch (err) {
+      console.error("Failed to send message:", err);
+    } finally {
+      setChatSending(false);
+    }
+  }, [activeChatUser, activeChatPublicKey, chatInput, chatSending, chatReady, user]);
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
+  // Handle URL params for deep-linking to chat
+  useEffect(() => {
+    const urlTab = searchParams.get("tab");
+    const urlUser = searchParams.get("user");
+    if (urlTab === "chat") {
+      setTab("chat");
+      if (urlUser && chatReady) {
+        loadConversation(urlUser);
+      }
+    }
+  }, [searchParams, chatReady, loadConversation]);
+
+  // Auto-mark pokes as seen when community tab is active
+  useEffect(() => {
+    if (tab !== "community" || unseenPokeCount === 0) return;
+    markPokesSeen()
+      .then(() => {
+        setUnseenPokeCount(0);
+        setReceivedPokes((prev) => prev.map((p) => ({ ...p, seen: true })));
+      })
+      .catch(() => {});
+  }, [tab, unseenPokeCount]);
 
   const handleShareProfile = useCallback(async () => {
     if (!user) return;
@@ -246,54 +426,44 @@ export default function DashboardPage() {
     setTimeout(() => setProfileCopied(false), 2000);
   }, [user, language]);
 
+  /** Get a data URL for whichever compass view is active (2D or 3D). */
+  const getCompassDataUrl = useCallback(async (): Promise<string | null> => {
+    if (compassView === "3d") {
+      return compass3DRef.current?.toDataURL() ?? null;
+    }
+    if (!compassChartRef.current) return null;
+    return compassChartRef.current.toDataURL();
+  }, [compassView]);
+
   const handleDownloadDiagram = useCallback(async () => {
-    if (!compassChartRef.current) return;
     try {
-      const el = compassChartRef.current;
-      const dataUrl = await toPng(el, {
-        width: el.offsetWidth * 2,
-        height: el.offsetHeight * 2,
-        canvasWidth: el.offsetWidth * 2,
-        canvasHeight: el.offsetHeight * 2,
-        pixelRatio: 2,
-        backgroundColor: "#111",
-        style: { transform: "scale(2)", transformOrigin: "top left" },
-      });
+      const dataUrl = await getCompassDataUrl();
+      if (!dataUrl) return;
       const link = document.createElement("a");
-      link.download = "civic-compass.png";
+      link.download = `civic-compass-${compassView}.png`;
       link.href = dataUrl;
       link.click();
     } catch (err) {
       console.error("Failed to download diagram:", err);
     }
-  }, []);
+  }, [getCompassDataUrl, compassView]);
 
   const handleShareDiagram = useCallback(async () => {
-    if (!compassChartRef.current) return;
     try {
-      const el = compassChartRef.current;
-      const dataUrl = await toPng(el, {
-        width: el.offsetWidth * 2,
-        height: el.offsetHeight * 2,
-        canvasWidth: el.offsetWidth * 2,
-        canvasHeight: el.offsetHeight * 2,
-        pixelRatio: 2,
-        backgroundColor: "#111",
-        style: { transform: "scale(2)", transformOrigin: "top left" },
-      });
+      const dataUrl = await getCompassDataUrl();
+      if (!dataUrl) return;
       const blob = await (await fetch(dataUrl)).blob();
-      const file = new File([blob], "civic-compass.png", { type: "image/png" });
+      const file = new File([blob], `civic-compass-${compassView}.png`, { type: "image/png" });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], title: "My Civic Compass" });
       } else {
-        // Fallback: copy image URL to clipboard
         await navigator.clipboard.writeText(window.location.href);
         alert("Link copied to clipboard!");
       }
     } catch (err) {
       console.error("Failed to share diagram:", err);
     }
-  }, []);
+  }, [getCompassDataUrl, compassView]);
 
   async function handleSaveSnapshot() {
     if (!user) return;
@@ -494,6 +664,7 @@ export default function DashboardPage() {
     { id: "session", label: t("tab_session", language) },
     { id: "history", label: t("tab_history", language) },
     { id: "community", label: t("tab_community", language), badge: unseenPokeCount },
+    { id: "chat", label: t("tab_chat", language), badge: unseenMessageCount },
     { id: "wallet", label: t("tab_wallet", language) },
   ];
 
@@ -506,7 +677,7 @@ export default function DashboardPage() {
 
       {/* Tab bar */}
       <div
-        className="grid grid-cols-5 sm:flex gap-1 rounded-xl p-1 mb-6 sm:mb-8"
+        className="grid grid-cols-6 sm:flex gap-1 rounded-xl p-1 mb-6 sm:mb-8"
         style={{ background: "var(--bg-card)" }}
       >
         {tabs.map((tb) => (
@@ -514,9 +685,6 @@ export default function DashboardPage() {
             key={tb.id}
             onClick={() => {
               setTab(tb.id);
-              if (tb.id === "community" && unseenPokeCount > 0) {
-                markPokesSeen().then(() => setUnseenPokeCount(0)).catch(() => {});
-              }
             }}
             className="relative flex-1 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all"
             style={{
@@ -630,8 +798,10 @@ export default function DashboardPage() {
             />
           ) : (
             <Compass3D
+              ref={compass3DRef}
               dimensions={compass.dimensions}
               confidence={compass.confidence}
+              userId={showUserId ? user?.id : undefined}
             />
           )}
 
@@ -1183,16 +1353,16 @@ export default function DashboardPage() {
                       </div>
                       <div className="flex gap-2">
                         {poke.mutual ? (
-                          <a
-                            href={`https://chat.blockscan.com/eth/${poke.sender.walletAddress}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            onClick={() => {
+                              setTab("chat");
+                              loadConversation(poke.senderId);
+                            }}
                             className="btn-primary text-xs py-1.5 px-4 flex items-center gap-1.5"
                           >
-                            <MessageSquare size={12} strokeWidth={1.5} />
-                            {t("chat_blockscan", language)}
-                            <ExternalLink size={10} strokeWidth={1.5} />
-                          </a>
+                            <Lock size={12} strokeWidth={1.5} />
+                            {t("start_chat", language)}
+                          </button>
                         ) : (
                           <button
                             onClick={async () => {
@@ -1444,16 +1614,16 @@ export default function DashboardPage() {
                       {/* Connection action buttons */}
                       <div className="pt-2 border-t" style={{ borderColor: "var(--border-color)" }}>
                         {m.connectionStatus === "ACCEPTED" ? (
-                          <a
-                            href={`https://chat.blockscan.com/eth/${m.walletAddress}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            onClick={() => {
+                              setTab("chat");
+                              loadConversation(m.userId);
+                            }}
                             className="btn-primary text-sm py-2 px-4 w-full flex items-center justify-center gap-2"
                           >
-                            <MessageSquare size={14} strokeWidth={1.5} />
-                            {t("chat_blockscan", language)}
-                            <ExternalLink size={12} strokeWidth={1.5} />
-                          </a>
+                            <Lock size={14} strokeWidth={1.5} />
+                            {t("start_chat", language)}
+                          </button>
                         ) : m.connectionStatus === "PENDING" && m.connectionDirection === "sent" ? (
                           <div className="flex gap-2">
                             <span className="flex-1 flex items-center justify-center gap-1.5 text-sm py-2 rounded-xl" style={{ background: "var(--component-primary)", color: "var(--text-muted)" }}>
@@ -1606,19 +1776,198 @@ export default function DashboardPage() {
                         </div>
                       </div>
                     </div>
-                    <a
-                      href={c.blockscanChatUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={() => {
+                        setTab("chat");
+                        loadConversation(c.userId);
+                      }}
                       className="btn-primary text-xs py-2 px-4 mt-3 w-full flex items-center justify-center gap-2"
                     >
-                      <MessageSquare size={14} strokeWidth={1.5} />
-                      {t("chat_blockscan", language)}
-                      <ExternalLink size={12} strokeWidth={1.5} />
-                    </a>
+                      <Lock size={14} strokeWidth={1.5} />
+                      {t("start_chat", language)}
+                    </button>
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Chat tab */}
+      {tab === "chat" && (
+        <div className="space-y-4">
+          {!chatReady ? (
+            /* Enable chat prompt */
+            <div className="card p-8 text-center space-y-4">
+              <div className="w-16 h-16 mx-auto rounded-full flex items-center justify-center" style={{ background: "var(--accent-gradient-soft)" }}>
+                <Lock size={28} strokeWidth={1.5} style={{ color: "var(--accent-primary)" }} />
+              </div>
+              <h3 className="text-lg font-semibold">{t("chat_enable", language)}</h3>
+              <p className="text-sm max-w-md mx-auto" style={{ color: "var(--text-secondary)" }}>
+                {t("chat_enable_desc", language)}
+              </p>
+              <button
+                onClick={enableChat}
+                disabled={chatSigning}
+                className="btn-primary py-3 px-8 text-sm font-semibold flex items-center gap-2 mx-auto"
+              >
+                {chatSigning ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    {t("chat_signing", language)}
+                  </>
+                ) : (
+                  <>
+                    <Shield size={16} strokeWidth={1.5} />
+                    {t("chat_enable", language)}
+                  </>
+                )}
+              </button>
+            </div>
+          ) : activeChatUser ? (
+            /* Conversation view */
+            <div className="card overflow-hidden" style={{ maxHeight: "70vh", display: "flex", flexDirection: "column" }}>
+              {/* Chat header */}
+              <div className="flex items-center gap-3 p-4 border-b" style={{ borderColor: "var(--border-color)" }}>
+                <button
+                  onClick={() => { setActiveChatUser(null); setActiveChatPublicKey(null); setChatMessages([]); }}
+                  className="hover:opacity-70 transition-opacity"
+                >
+                  <ArrowLeft size={18} strokeWidth={1.5} />
+                </button>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold">
+                    {chatThreads.find((th) => th.userId === activeChatUser)?.displayName || t("anonymous_user", language)}
+                  </p>
+                  <p className="text-[10px] flex items-center gap-1" style={{ color: "var(--text-muted)" }}>
+                    <Lock size={9} strokeWidth={1.5} />
+                    E2E Encrypted
+                  </p>
+                </div>
+              </div>
+
+              {/* Messages area */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{ minHeight: "300px" }}>
+                {chatLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 size={24} className="animate-spin" style={{ color: "var(--text-muted)" }} />
+                  </div>
+                ) : !activeChatPublicKey ? (
+                  <div className="flex items-center justify-center h-full text-center">
+                    <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                      This user hasn&apos;t enabled encrypted chat yet.
+                    </p>
+                  </div>
+                ) : chatMessages.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-center">
+                    <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                      {t("no_messages", language)}
+                    </p>
+                  </div>
+                ) : (
+                  chatMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex ${msg.senderId === user?.id ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className="max-w-[75%] rounded-2xl px-4 py-2.5 text-sm"
+                        style={{
+                          background: msg.senderId === user?.id ? "var(--accent-gradient)" : "var(--component-primary)",
+                          color: msg.senderId === user?.id ? "#111" : "var(--text-primary)",
+                          borderBottomRightRadius: msg.senderId === user?.id ? "4px" : undefined,
+                          borderBottomLeftRadius: msg.senderId !== user?.id ? "4px" : undefined,
+                        }}
+                      >
+                        {msg.plaintext ?? (
+                          <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>⚠ Unable to decrypt</span>
+                        )}
+                        <p className="text-[9px] mt-1 opacity-60">
+                          {new Date(msg.createdAt).toLocaleTimeString(language === "fa" ? "fa-IR" : "en-US", { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Message input */}
+              {activeChatPublicKey && (
+                <div className="p-3 border-t flex gap-2" style={{ borderColor: "var(--border-color)" }}>
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+                    placeholder={t("chat_placeholder", language)}
+                    className="flex-1 rounded-xl px-4 py-2.5 text-sm outline-none"
+                    style={{ background: "var(--component-primary)", color: "var(--text-primary)", border: "1px solid var(--border-color)" }}
+                  />
+                  <button
+                    onClick={handleSendMessage}
+                    disabled={chatSending || !chatInput.trim()}
+                    className="btn-primary rounded-xl px-4 py-2.5 flex items-center gap-1.5 text-sm"
+                    style={{ opacity: chatSending || !chatInput.trim() ? 0.5 : 1 }}
+                  >
+                    {chatSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} strokeWidth={1.5} />}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Thread list */
+            <div>
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <Lock size={14} strokeWidth={1.5} style={{ color: "var(--accent-primary)" }} />
+                {t("chat_title", language)}
+              </h3>
+              {chatThreads.length === 0 ? (
+                <div className="card p-8 text-center">
+                  <MessageSquare size={32} strokeWidth={1} className="mx-auto mb-3 opacity-40" />
+                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                    {t("no_chats", language)}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {chatThreads.map((thread) => (
+                    <button
+                      key={thread.userId}
+                      onClick={() => loadConversation(thread.userId)}
+                      className="card p-4 w-full text-left hover:opacity-90 transition-opacity"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold"
+                            style={{ background: "var(--accent-gradient)", color: "#111" }}
+                          >
+                            <MessageCircle size={16} strokeWidth={1.5} />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">
+                              {thread.displayName || t("anonymous_user", language)}
+                            </p>
+                            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                              {thread.lastMessageAt ? new Date(thread.lastMessageAt).toLocaleDateString(language === "fa" ? "fa-IR" : "en-US") : ""}
+                            </p>
+                          </div>
+                        </div>
+                        {thread.unseenCount > 0 && (
+                          <span
+                            className="text-[10px] font-bold rounded-full px-2 py-0.5"
+                            style={{ background: "var(--accent-gradient)", color: "#111" }}
+                          >
+                            {thread.unseenCount}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
