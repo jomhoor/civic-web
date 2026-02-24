@@ -212,6 +212,7 @@ function DashboardContent() {
   // Session state
   const [sessionQuestions, setSessionQuestions] = useState<Question[]>([]);
   const [sessionIndex, setSessionIndex] = useState(0);
+  const [sessionAnswers, setSessionAnswers] = useState<Record<string, number>>({});
   const [sessionDone, setSessionDone] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(false);
 
@@ -619,6 +620,7 @@ function DashboardContent() {
       const qs = await getNextQuestions(user.id, 999, selectedQuestionnaire?.questionnaireId);
       setSessionQuestions(qs);
       setSessionIndex(0);
+      setSessionAnswers({});
       setSessionDone(qs.length === 0);
     } catch (err) {
       console.error("Failed to load session:", err);
@@ -638,6 +640,8 @@ function DashboardContent() {
       await submitResponses(user.id, [
         { questionId, answerValue, responseTimeMs },
       ]);
+
+      setSessionAnswers((prev) => ({ ...prev, [questionId]: answerValue }));
 
       if (sessionIndex < sessionQuestions.length - 1) {
         setSessionIndex((i) => i + 1);
@@ -1073,10 +1077,21 @@ function DashboardContent() {
                   />
                 </div>
               </div>
+              {sessionIndex > 0 && (
+                <button
+                  onClick={() => setSessionIndex((i) => i - 1)}
+                  className="flex items-center gap-1.5 text-sm py-1.5 px-3 rounded-lg transition-colors hover:bg-white/5"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  <ArrowLeft size={14} strokeWidth={1.5} />
+                  {t("previous_question", language)}
+                </button>
+              )}
               <QuestionCard
                 key={sessionQuestions[sessionIndex].id}
                 question={sessionQuestions[sessionIndex]}
                 onAnswer={handleSessionAnswer}
+                initialValue={sessionAnswers[sessionQuestions[sessionIndex].id] ?? 0}
               />
             </div>
           )}

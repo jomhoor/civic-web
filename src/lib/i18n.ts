@@ -38,6 +38,7 @@ const en = {
   view_compass: "View Compass",
   another_round: "Another Round",
   question_of: "Question {current} of {total}",
+  previous_question: "Previous",
 
   // Questionnaires
   questionnaire_choose: "Choose a Questionnaire",
@@ -111,7 +112,7 @@ const en = {
   // Connect
   connect_title: "Connect to Civic Compass",
   connect_desc: "To experience the full version, connect with a smart wallet",
-  connect_button: "Quick Start (Dev Mode)",
+  connect_button: "Connect Wallet",
   connect_button_loading: "Connecting...",
   connect_error: "Failed to connect. Is the backend running on port 3001?",
   connect_footer: "MetaMask & WalletConnect",
@@ -337,6 +338,7 @@ const fa: typeof en = {
   view_compass: "مشاهده قطب‌نما",
   another_round: "دور دیگر",
   question_of: "سؤال {current} از {total}",
+  previous_question: "قبلی",
 
   // Questionnaires
   questionnaire_choose: "یک پرسشنامه انتخاب کنید",

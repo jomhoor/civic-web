@@ -15,10 +15,11 @@ interface Question {
 interface QuestionCardProps {
   question: Question;
   onAnswer: (questionId: string, value: number, responseTimeMs: number) => void | Promise<void>;
+  initialValue?: number;
 }
 
-export function QuestionCard({ question, onAnswer }: QuestionCardProps) {
-  const [value, setValue] = useState(0);
+export function QuestionCard({ question, onAnswer, initialValue = 0 }: QuestionCardProps) {
+  const [value, setValue] = useState(initialValue);
   const [startTime] = useState(Date.now());
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);

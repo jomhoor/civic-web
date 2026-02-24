@@ -211,7 +211,9 @@ export default function ConnectPage() {
         <div className="pt-6" style={{ borderTop: "1px solid var(--border-color)" }}>
           <p className="text-sm flex items-center justify-center gap-1.5" style={{ color: "var(--text-muted)" }}>
             <Lock size={14} strokeWidth={1.5} />
-            {t("connect_footer", language)}
+            <a href="https://metamask.io" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: "var(--accent-primary)" }}>MetaMask</a>
+            {language === "fa" ? " و " : " & "}
+            <a href="https://walletconnect.com" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: "var(--accent-primary)" }}>WalletConnect</a>
           </p>
         </div>
 
