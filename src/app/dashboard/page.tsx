@@ -51,7 +51,7 @@ import {
 import { AXIS_KEYS, axisLabel, t } from "@/lib/i18n";
 import { useAppStore } from "@/lib/store";
 
-import { ArrowDownRight, ArrowLeft, ArrowUpRight, BarChart3, BookOpen, Check, CircleCheckBig, Clock, Download, ExternalLink, Eye, EyeOff, GitCompare, Link, Loader2, Lock, MessageCircle, MessageSquare, Minus, Puzzle, RotateCcw, Scan, Send, Share2, Shield, Swords, UserPlus, Users, X, Zap } from "lucide-react";
+import { ArrowDownRight, ArrowLeft, ArrowUpRight, BarChart3, BookOpen, Check, CircleCheckBig, Clock, Download, ExternalLink, Eye, EyeOff, GitCompare, Link, Loader2, Lock, MessageCircle, MessageSquare, Minus, Puzzle, RotateCcw, Scan, Send, Share2, Shield, Swords, UserPlus, Users, Wallet, X, Zap } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSignMessage } from "wagmi";
@@ -154,7 +154,8 @@ function DashboardContent() {
   const searchParams = useSearchParams();
   const user = useAppStore((s) => s.user);
   const language = useAppStore((s) => s.language);
-  const [tab, setTab] = useState<Tab>("compass");
+  const isGuest = useAppStore((s) => s.isGuest);
+  const [tab, setTab] = useState<Tab>(isGuest ? "session" : "compass");
   const [compassView, setCompassView] = useState<"2d" | "3d">("2d");
   const [showUserId, setShowUserId] = useState(false);
   const compassChartRef = useRef<CompassChartHandle>(null);
@@ -252,45 +253,52 @@ function DashboardContent() {
 
     async function load() {
       try {
-        const [compassData, historyData, walletData, freqData, matchSettingsData, incomingData, connectionsData, progressData, pokesData, pokeCountData, chatThreadsData, unseenMsgData] = await Promise.all([
-          getCompass(user!.id),
-          getHistory(user!.id),
-          getWallet(user!.id).catch(() => null),
-          getFrequencyPreference().catch(() => null),
-          getMatchSettings().catch(() => null),
-          getIncomingRequests().catch(() => []),
-          getConnections().catch(() => []),
+        // Core data all users need
+        const [compassData, historyData, progressData] = await Promise.all([
+          getCompass(user!.id).catch(() => null),
+          getHistory(user!.id).catch(() => []),
           getQuestionnaireProgress().catch(() => []),
-          getReceivedPokes().catch(() => []),
-          getUnseenPokeCount().catch(() => ({ count: 0 })),
-          getChatThreads().catch(() => []),
-          getUnseenMessageCount().catch(() => ({ count: 0 })),
         ]);
-        setCompass(compassData);
-        setHistory(historyData);
-        setWallet(walletData);
-        if (freqData?.frequencyPreference) {
-          setFrequency(freqData.frequencyPreference);
-        }
-        if (matchSettingsData) {
-          setSharingMode(matchSettingsData.sharingMode ?? "GHOST");
-          setDisplayName(matchSettingsData.displayName ?? "");
-          setMatchThreshold(matchSettingsData.matchThreshold ?? 0.8);
-        }
-        setIncomingRequests(incomingData ?? []);
-        setConnections(connectionsData ?? []);
+        if (compassData) setCompass(compassData);
+        setHistory(historyData ?? []);
         setQuestionnaireProgress(progressData ?? []);
-        setReceivedPokes(pokesData ?? []);
-        setUnseenPokeCount(pokeCountData?.count ?? 0);
-        setChatThreads(chatThreadsData ?? []);
-        setUnseenMessageCount(unseenMsgData?.count ?? 0);
+
+        // Network features — skip for guest users
+        if (!isGuest) {
+          const [walletData, freqData, matchSettingsData, incomingData, connectionsData, pokesData, pokeCountData, chatThreadsData, unseenMsgData] = await Promise.all([
+            getWallet(user!.id).catch(() => null),
+            getFrequencyPreference().catch(() => null),
+            getMatchSettings().catch(() => null),
+            getIncomingRequests().catch(() => []),
+            getConnections().catch(() => []),
+            getReceivedPokes().catch(() => []),
+            getUnseenPokeCount().catch(() => ({ count: 0 })),
+            getChatThreads().catch(() => []),
+            getUnseenMessageCount().catch(() => ({ count: 0 })),
+          ]);
+          setWallet(walletData);
+          if (freqData?.frequencyPreference) {
+            setFrequency(freqData.frequencyPreference);
+          }
+          if (matchSettingsData) {
+            setSharingMode(matchSettingsData.sharingMode ?? "GHOST");
+            setDisplayName(matchSettingsData.displayName ?? "");
+            setMatchThreshold(matchSettingsData.matchThreshold ?? 0.8);
+          }
+          setIncomingRequests(incomingData ?? []);
+          setConnections(connectionsData ?? []);
+          setReceivedPokes(pokesData ?? []);
+          setUnseenPokeCount(pokeCountData?.count ?? 0);
+          setChatThreads(chatThreadsData ?? []);
+          setUnseenMessageCount(unseenMsgData?.count ?? 0);
+        }
       } catch (err) {
         console.error("Failed to load dashboard data:", err);
       }
     }
 
     load();
-  }, [user, router]);
+  }, [user, router, isGuest]);
 
   // ─── E2E Chat helpers ───────────────────────────────────────
 
@@ -674,17 +682,18 @@ function DashboardContent() {
       </div>
 
       {/* Tab bar */}
-      <div
-        className="grid grid-cols-6 sm:flex gap-1 rounded-xl p-1 mb-6 sm:mb-8"
-        style={{ background: "var(--bg-card)" }}
-      >
+      <div className="overflow-x-auto mb-6 sm:mb-8 scrollbar-hide" style={{ WebkitOverflowScrolling: "touch" } as React.CSSProperties}>
+        <div
+          className="inline-flex gap-1 rounded-xl p-1 min-w-full"
+          style={{ background: "var(--bg-card)" }}
+        >
         {tabs.map((tb) => (
           <button
             key={tb.id}
             onClick={() => {
               setTab(tb.id);
             }}
-            className="relative flex-1 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all"
+            className="relative shrink-0 flex-1 py-2.5 sm:py-2 px-3 sm:px-4 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap"
             style={{
               background:
                 tab === tb.id ? "var(--accent-gradient)" : "transparent",
@@ -700,6 +709,7 @@ function DashboardContent() {
             ) : null}
           </button>
         ))}
+        </div>
       </div>
 
       {/* Compass tab */}
@@ -707,7 +717,7 @@ function DashboardContent() {
         <div className="space-y-6">
           {/* View toggle + export toggle */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            {/* 2D / 3D toggle */}
+            {/* 2D / 3D toggle + actions */}
             <div
               className="flex gap-1 rounded-full p-1"
               style={{ background: "var(--component-primary)", border: "1px solid var(--border-color)" }}
@@ -735,7 +745,7 @@ function DashboardContent() {
             </div>
 
             {/* Download / Share */}
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <button
                 onClick={() => setShowUserId((v) => !v)}
                 className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all"
@@ -1014,7 +1024,7 @@ function DashboardContent() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
+              <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   {selectedQuestionnaire && (
                     <button
@@ -1041,25 +1051,18 @@ function DashboardContent() {
                     {t("question_of", language, { current: sessionIndex + 1, total: sessionQuestions.length })}
                   </p>
                 </div>
-                <div className="flex gap-1 flex-wrap max-w-full">
-                  {sessionQuestions.map((_, i) => (
-                    <div
-                      key={i}
-                      className="w-2.5 h-2.5 rounded-full transition-all flex-shrink-0"
-                      style={{
-                        background:
-                          i < sessionIndex
-                            ? "var(--accent-primary)"
-                            : i === sessionIndex
-                              ? "rgba(91, 157, 245, 0.35)"
-                              : "var(--component-primary)",
-                        boxShadow:
-                          i === sessionIndex
-                            ? "0 0 0 2px var(--accent-primary)"
-                            : "none",
-                      }}
-                    />
-                  ))}
+                {/* Progress bar */}
+                <div
+                  className="w-full h-1.5 rounded-full overflow-hidden"
+                  style={{ background: "var(--component-primary)" }}
+                >
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{
+                      width: `${((sessionIndex + 1) / sessionQuestions.length) * 100}%`,
+                      background: "var(--accent-gradient)",
+                    }}
+                  />
                 </div>
               </div>
               <QuestionCard
@@ -1311,6 +1314,24 @@ function DashboardContent() {
 
       {/* Community tab */}
       {tab === "community" && (
+        isGuest ? (
+          <div className="card p-8 flex flex-col items-center justify-center gap-4 text-center">
+            <Users size={32} strokeWidth={1.5} style={{ color: "var(--text-muted)" }} />
+            <h3 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
+              {t("guest_connect_title", language)}
+            </h3>
+            <p className="text-sm max-w-xs" style={{ color: "var(--text-secondary)" }}>
+              {t("guest_connect_community", language)}
+            </p>
+            <button
+              onClick={() => { useAppStore.getState().logout(); router.push("/connect"); }}
+              className="btn-primary flex items-center gap-2 px-6 py-2.5 text-sm"
+            >
+              <Wallet size={16} strokeWidth={1.5} />
+              {t("connect_wallet", language)}
+            </button>
+          </div>
+        ) : (
         <div className="space-y-6">
           {/* Received Pokes */}
           {receivedPokes.length > 0 && (
@@ -1790,10 +1811,29 @@ function DashboardContent() {
             </div>
           )}
         </div>
+        )
       )}
 
       {/* Chat tab */}
       {tab === "chat" && (
+        isGuest ? (
+          <div className="card p-8 flex flex-col items-center justify-center gap-4 text-center">
+            <MessageSquare size={32} strokeWidth={1.5} style={{ color: "var(--text-muted)" }} />
+            <h3 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
+              {t("guest_connect_title", language)}
+            </h3>
+            <p className="text-sm max-w-xs" style={{ color: "var(--text-secondary)" }}>
+              {t("guest_connect_chat", language)}
+            </p>
+            <button
+              onClick={() => { useAppStore.getState().logout(); router.push("/connect"); }}
+              className="btn-primary flex items-center gap-2 px-6 py-2.5 text-sm"
+            >
+              <Wallet size={16} strokeWidth={1.5} />
+              {t("connect_wallet", language)}
+            </button>
+          </div>
+        ) : (
         <div className="space-y-4">
           {!chatReady ? (
             /* Enable chat prompt */
@@ -1969,10 +2009,29 @@ function DashboardContent() {
             </div>
           )}
         </div>
+        )
       )}
 
       {/* Wallet tab */}
       {tab === "wallet" && (
+        isGuest ? (
+          <div className="card p-8 flex flex-col items-center justify-center gap-4 text-center">
+            <Wallet size={32} strokeWidth={1.5} style={{ color: "var(--text-muted)" }} />
+            <h3 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
+              {t("guest_connect_title", language)}
+            </h3>
+            <p className="text-sm max-w-xs" style={{ color: "var(--text-secondary)" }}>
+              {t("guest_connect_wallet", language)}
+            </p>
+            <button
+              onClick={() => { useAppStore.getState().logout(); router.push("/connect"); }}
+              className="btn-primary flex items-center gap-2 px-6 py-2.5 text-sm"
+            >
+              <Wallet size={16} strokeWidth={1.5} />
+              {t("connect_wallet", language)}
+            </button>
+          </div>
+        ) : (
         <div className="space-y-6">
           {wallet ? (
             <>
@@ -2003,6 +2062,7 @@ function DashboardContent() {
             </p>
           )}
         </div>
+        )
       )}
 
       {/* Public Analytics link */}

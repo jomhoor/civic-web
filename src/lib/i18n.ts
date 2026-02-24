@@ -15,7 +15,7 @@ const en = {
 
   // Navigation
   tab_compass: "Compass",
-  tab_session: "Session",
+  tab_session: "Questionnaires",
   tab_history: "History",
   tab_wallet: "Wallet",
 
@@ -115,6 +115,12 @@ const en = {
   connect_button_loading: "Connecting...",
   connect_error: "Failed to connect. Is the backend running on port 3001?",
   connect_footer: "MetaMask & WalletConnect coming in Phase 1 completion",
+  skip_connect: "Continue without wallet",
+  connect_wallet: "Connect Wallet",
+  guest_connect_title: "Wallet Required",
+  guest_connect_community: "Connect your wallet to discover people with similar or opposing views, send pokes, and build connections.",
+  guest_connect_chat: "Connect your wallet to enable end-to-end encrypted messaging with your connections.",
+  guest_connect_wallet: "Connect your wallet to view your token balance and transaction history.",
 
   // Onboarding detail
   onboard_welcome: "Welcome to Civic Compass",
@@ -303,7 +309,7 @@ const fa: typeof en = {
 
   // Navigation
   tab_compass: "قطب‌نما",
-  tab_session: "جلسه",
+  tab_session: "پرسشنامه‌ها",
   tab_history: "تاریخچه",
   tab_wallet: "کیف پول",
 
@@ -401,6 +407,12 @@ const fa: typeof en = {
   connect_button_loading: "در حال اتصال...",
   connect_error: "اتصال ناموفق. آیا بک‌اند روی پورت 3001 اجرا می‌شود؟",
   connect_footer: "MetaMask و WalletConnect در تکمیل فاز ۱",
+  skip_connect: "ادامه بدون کیف پول",
+  connect_wallet: "اتصال کیف پول",
+  guest_connect_title: "کیف پول لازم است",
+  guest_connect_community: "برای کشف افراد با دیدگاه مشابه یا متفاوت، ارسال پوک و ایجاد ارتباط، کیف پول خود را متصل کنید.",
+  guest_connect_chat: "برای فعال‌سازی پیام‌رسانی رمزگذاری‌شده با ارتباطات خود، کیف پول خود را متصل کنید.",
+  guest_connect_wallet: "برای مشاهده موجودی توکن و تاریخچه تراکنش‌ها، کیف پول خود را متصل کنید.",
 
   // Onboarding detail
   onboard_welcome: "به قطب‌نمای مدنی خوش آمدید",

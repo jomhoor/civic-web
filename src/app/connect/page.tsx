@@ -1,10 +1,10 @@
 "use client";
 
-import { getNonce, verifySiwe } from "@/lib/api";
+import { createGuestSession, getNonce, verifySiwe } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useAppStore } from "@/lib/store";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { Loader2, Lock, Wallet } from "lucide-react";
+import { Loader2, Lock, UserCircle, Wallet } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { SiweMessage } from "siwe";
@@ -14,6 +14,7 @@ import { polygon } from "wagmi/chains";
 export default function ConnectPage() {
   const router = useRouter();
   const setAuth = useAppStore((s) => s.setAuth);
+  const setGuestAuth = useAppStore((s) => s.setGuestAuth);
   const language = useAppStore((s) => s.language);
 
   const { openConnectModal } = useConnectModal();
@@ -100,6 +101,20 @@ export default function ConnectPage() {
     }
   }, [address, switchChainAsync, signMessageAsync, setAuth, router, disconnect, language, siweAttempted]);
 
+  const [guestLoading, setGuestLoading] = useState(false);
+
+  const handleSkip = useCallback(async () => {
+    setGuestLoading(true);
+    try {
+      const { user, token } = await createGuestSession();
+      setGuestAuth(user, token);
+      router.push("/dashboard");
+    } catch (err) {
+      console.error("Guest auth failed:", err);
+      setGuestLoading(false);
+    }
+  }, [setGuestAuth, router]);
+
   // When wallet connects, auto-trigger the flow
   useEffect(() => {
     if (isConnected && address && status === "idle") {
@@ -133,18 +148,36 @@ export default function ConnectPage() {
             </p>
           </div>
         ) : (
-          <button
-            onClick={() => {
-              setError("");
-              setSiweAttempted(false);
-              setStatus("idle");
-              openConnectModal?.();
-            }}
-            className="btn-primary w-full justify-center text-lg flex items-center gap-2"
-          >
-            <Wallet size={18} strokeWidth={1.5} />
-            {t("connect_button", language)}
-          </button>
+          <div className="space-y-3">
+            <button
+              onClick={() => {
+                setError("");
+                setSiweAttempted(false);
+                setStatus("idle");
+                openConnectModal?.();
+              }}
+              className="btn-primary w-full justify-center text-lg flex items-center gap-2"
+            >
+              <Wallet size={18} strokeWidth={1.5} />
+              {t("connect_button", language)}
+            </button>
+            <button
+              onClick={handleSkip}
+              disabled={guestLoading}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all"
+              style={{
+                color: "var(--text-secondary)",
+                background: "transparent",
+              }}
+            >
+              {guestLoading ? (
+                <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />
+              ) : (
+                <UserCircle size={16} strokeWidth={1.5} />
+              )}
+              {t("skip_connect", language)}
+            </button>
+          </div>
         )}
 
         {error && (

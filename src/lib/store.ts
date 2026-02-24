@@ -15,12 +15,14 @@ export type FontSize = "normal" | "large" | "xlarge";
 interface AppState {
   user: User | null;
   token: string | null;
+  isGuest: boolean;
   theme: Theme;
   language: Language;
   fontSize: FontSize;
   hasVisited: boolean;
   hasOnboarded: boolean;
   setAuth: (user: User, token: string) => void;
+  setGuestAuth: (user: User, token: string) => void;
   logout: () => void;
   setTheme: (theme: Theme) => void;
   setLanguage: (language: Language) => void;
@@ -34,13 +36,15 @@ export const useAppStore = create<AppState>()(
     (set) => ({
       user: null,
       token: null,
+      isGuest: false,
       theme: "dark",
       language: "en",
       fontSize: "normal",
       hasVisited: false,
       hasOnboarded: false,
-      setAuth: (user, token) => set({ user, token, hasVisited: true, hasOnboarded: true }),
-      logout: () => set({ user: null, token: null }),
+      setAuth: (user, token) => set({ user, token, isGuest: false, hasVisited: true, hasOnboarded: true }),
+      setGuestAuth: (user, token) => set({ user, token, isGuest: true, hasVisited: true, hasOnboarded: true }),
+      logout: () => set({ user: null, token: null, isGuest: false }),
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
       setFontSize: (fontSize) => set({ fontSize }),

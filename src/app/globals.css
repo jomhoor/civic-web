@@ -333,3 +333,12 @@ input[type="range"]::-moz-range-thumb {
   border-radius: 50%;
   animation: pulse 2s infinite;
 }
+
+/* ── Hide scrollbar (keep scroll) ── */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

@@ -34,6 +34,11 @@ export async function getNonce(): Promise<{ nonce: string }> {
   return data;
 }
 
+export async function createGuestSession(): Promise<{ user: any; token: string }> {
+  const { data } = await api.post("/auth/guest");
+  return data;
+}
+
 export async function verifySiwe(message: string, signature: string) {
   const { data } = await api.post("/auth/verify", { message, signature });
   return data;
