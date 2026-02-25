@@ -1917,7 +1917,7 @@ function DashboardContent() {
                 ) : !activeChatPublicKey ? (
                   <div className="flex items-center justify-center h-full text-center">
                     <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                      This user hasn&apos;t enabled encrypted chat yet.
+                      {t("chat_not_enabled", language)}
                     </p>
                   </div>
                 ) : chatMessages.length === 0 ? (

@@ -58,7 +58,7 @@ export function QuestionCard({ question, onAnswer, initialValue = 0 }: QuestionC
       </p>
 
       <div className="space-y-4">
-        <div className="flex justify-between text-xs sm:text-sm" style={{ color: "var(--text-muted)" }}>
+        <div className="flex justify-between text-xs sm:text-sm" style={{ color: "var(--text-muted)", direction: "ltr" }}>
           <span>{t("strongly_disagree", language)}</span>
           <span>{t("strongly_agree", language)}</span>
         </div>
