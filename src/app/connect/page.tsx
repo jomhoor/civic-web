@@ -2,6 +2,11 @@
 
 import { createGuestSession, getNonce, verifySiwe } from "@/lib/api";
 import { t } from "@/lib/i18n";
+import {
+  getJomhoorAddress,
+  isInsideJomhoor,
+  signMessageViaBridge,
+} from "@/lib/jomhoor-bridge";
 import { useAppStore } from "@/lib/store";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { ExternalLink, HelpCircle, Loader2, Lock, UserCircle, Wallet, X } from "lucide-react";
@@ -122,6 +127,58 @@ export default function ConnectPage() {
       handleSiwe();
     }
   }, [isConnected, address, status, handleSiwe]);
+
+  // ── Jomhoor WebView bridge: auto-authenticate via native wallet ──
+  useEffect(() => {
+    if (!isInsideJomhoor()) return;
+    const jomhoorAddress = getJomhoorAddress();
+    if (!jomhoorAddress) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setStatus("signing");
+
+        // 1. Get nonce from backend
+        const { nonce } = await getNonce();
+        if (cancelled) return;
+
+        // 2. Build SIWE message
+        const siweMessage = new SiweMessage({
+          domain: window.location.host,
+          address: jomhoorAddress,
+          statement: "Sign in to Civic Compass",
+          uri: window.location.origin,
+          version: "1",
+          chainId: polygon.id,
+          nonce,
+        });
+        const messageStr = siweMessage.prepareMessage();
+
+        // 3. Sign via native bridge
+        const signature = await signMessageViaBridge(messageStr);
+        if (cancelled) return;
+
+        // 4. Verify with backend
+        setStatus("verifying");
+        const result = await verifySiwe(messageStr, signature);
+        setAuth(result.user, result.token);
+
+        // 5. Navigate
+        const hasOnboarded = useAppStore.getState().hasOnboarded;
+        router.push(hasOnboarded ? "/dashboard" : "/onboarding");
+      } catch (err) {
+        console.error("[JomhoorBridge] SIWE failed:", err);
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Connection failed");
+          setStatus("error");
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [setAuth, router]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const statusMessage = status === "switching"
     ? (language === "fa" ? "لطفاً به شبکه Polygon تغییر دهید..." : "Switching to Polygon network...")
