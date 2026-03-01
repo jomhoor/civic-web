@@ -7,6 +7,7 @@ import {
     HelpCircle,
     Map,
     Monitor,
+    Target,
     Zap,
 } from "lucide-react";
 
@@ -16,6 +17,7 @@ const iconMap: Record<string, React.ComponentType<LucideProps>> = {
   Monitor,
   Map,
   BarChart3,
+  Target,
 };
 
 interface QuestionnaireIconProps extends LucideProps {

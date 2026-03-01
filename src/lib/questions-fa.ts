@@ -479,4 +479,22 @@ export const questionsFa: Record<string, string> = {
     "حفظ هویت ملی مشترک مهم‌تر از جشن گرفتن تفاوت‌های فرهنگی است.",
   "Multilingual government services and multicultural education enrich a society.":
     "خدمات دولتی چندزبانه و آموزش چندفرهنگی یک جامعه را غنی‌تر می‌کنند.",
+
+  // ── Snapshot Compass (8 questions, 1 per axis) ──
+  "The government should actively redistribute wealth from the rich to the poor.":
+    "دولت باید به‌طور فعال ثروت را از ثروتمندان به فقرا بازتوزیع کند.",
+  "A strong central authority is more effective than distributed democratic decision-making.":
+    "یک قدرت مرکزی قوی مؤثرتر از تصمیم‌گیری دموکراتیک توزیع‌شده است.",
+  "People should be free to say anything, even if others find it deeply offensive.":
+    "مردم باید آزاد باشند هر چیزی بگویند، حتی اگر دیگران آن را عمیقاً توهین‌آمیز بدانند.",
+  "Traditional family structures and social norms are essential for a stable society.":
+    "ساختارهای سنتی خانواده و هنجارهای اجتماعی برای یک جامعه باثبات ضروری هستند.",
+  "My country's interests should always come before international cooperation.":
+    "منافع کشور من باید همیشه بر همکاری بین‌المللی مقدم باشد.",
+  "Economic growth must be sacrificed when it conflicts with environmental protection.":
+    "رشد اقتصادی باید فدای حفاظت از محیط زیست شود وقتی با آن در تضاد است.",
+  "Harsh punishment is more effective at reducing crime than rehabilitation programs.":
+    "مجازات سخت در کاهش جرم مؤثرتر از برنامه‌های بازپروری است.",
+  "Governments should be able to access private communications to prevent crime and terrorism.":
+    "دولت‌ها باید بتوانند برای جلوگیری از جرم و تروریسم به ارتباطات خصوصی دسترسی داشته باشند.",
 };
