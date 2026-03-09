@@ -16,7 +16,22 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_SITE_URL ?? "https://compass.jomhoor.org"
   ),
   title: "Civic Compass",
-  description: "Track your civic identity as it evolves",
+  description:
+    "Map your civic identity across eight dimensions. Your politics has a shape, not a side.",
+  openGraph: {
+    title: "Civic Compass — Your Multidimensional Voice",
+    description:
+      "Eight policy dimensions. One unique shape. Move beyond left-right — discover where you truly stand.",
+    url: "https://compass.jomhoor.org",
+    siteName: "Civic Compass",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Civic Compass — Your Multidimensional Voice",
+    description:
+      "Eight policy dimensions. One unique shape. Move beyond left-right.",
+  },
 };
 
 export default function RootLayout({
