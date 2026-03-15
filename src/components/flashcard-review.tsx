@@ -179,26 +179,26 @@ export function FlashcardReview({
               <button
                 onClick={() => handleRating("SEEN")}
                 disabled={saving}
-                className="py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all"
+                className="px-2 py-4 rounded-lg text-xs sm:text-sm font-medium transition-all cursor-pointer w-full"
                 style={{ background: "rgba(239,68,68,0.15)", color: "var(--error)" }}
               >
-                ❌ {t("flashcard_didnt_know", language)}
+                {t("flashcard_didnt_know", language)}
               </button>
               <button
                 onClick={() => handleRating("LEARNING")}
                 disabled={saving}
-                className="py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all"
+                className="px-2 py-4 rounded-lg text-xs sm:text-sm font-medium transition-all cursor-pointer w-full"
                 style={{ background: "rgba(245,158,11,0.15)", color: "var(--warning, #f59e0b)" }}
               >
-                🔶 {t("flashcard_almost", language)}
+                {t("flashcard_almost", language)}
               </button>
               <button
                 onClick={() => handleRating("MASTERED")}
                 disabled={saving}
-                className="py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all"
+                className="px-2 py-4 rounded-lg text-xs sm:text-sm font-medium transition-all cursor-pointer w-full"
                 style={{ background: "rgba(34,197,94,0.15)", color: "var(--success, #22c55e)" }}
               >
-                ✅ {t("flashcard_knew_it", language)}
+                {t("flashcard_knew_it", language)}
               </button>
             </div>
           </div>

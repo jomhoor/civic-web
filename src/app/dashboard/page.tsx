@@ -2173,7 +2173,7 @@ function DashboardContent() {
                 className="card p-6 sm:p-8 max-w-sm w-full text-center shadow-xl"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="text-5xl mb-4">🏅</div>
+                <div className="text-5xl mb-4"></div>
                 <h3 className="text-xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>
                   {t("flashcard_complete_title", language)}
                 </h3>
