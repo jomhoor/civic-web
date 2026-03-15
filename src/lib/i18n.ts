@@ -335,6 +335,16 @@ const en = {
   flashcard_article: "Article",
   profile_badges: "Mastered Decks",
   profile_no_badges: "No completed decks yet",
+  tab_profile: "Profile",
+  profile_bio: "About",
+  profile_bio_placeholder: "Tell others a bit about yourself...",
+  profile_wallet_address: "Wallet Address",
+  profile_share_link: "Share Profile",
+  profile_link_copied: "Link copied!",
+  profile_save: "Save",
+  profile_saved: "Saved!",
+  profile_member_since: "Member since",
+  profile_view_public: "View public profile",
 };
 
 const fa: typeof en = {
@@ -668,6 +678,16 @@ const fa: typeof en = {
   flashcard_article: "ماده",
   profile_badges: "مجموعه‌های تکمیل‌شده",
   profile_no_badges: "هنوز مجموعه‌ای تکمیل نشده",
+  tab_profile: "پروفایل",
+  profile_bio: "درباره",
+  profile_bio_placeholder: "کمی درباره خودتان بنویسید...",
+  profile_wallet_address: "آدرس کیف پول",
+  profile_share_link: "اشتراک‌گذاری پروفایل",
+  profile_link_copied: "لینک کپی شد!",
+  profile_save: "ذخیره",
+  profile_saved: "ذخیره شد!",
+  profile_member_since: "عضو از",
+  profile_view_public: "مشاهده پروفایل عمومی",
 };
 
 const dictionaries: Record<Language, typeof en> = { en, fa };

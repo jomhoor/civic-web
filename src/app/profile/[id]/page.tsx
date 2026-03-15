@@ -16,6 +16,7 @@ interface ProfileData {
   id: string;
   wallet: string;
   displayName: string | null;
+  bio: string | null;
   createdAt: string;
   dimensions: Record<string, number>;
   confidence: Record<string, number>;
@@ -184,6 +185,11 @@ export default function ProfilePage() {
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             {t("joined", language)} {joinDate}
           </p>
+          {profile.bio && (
+            <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
+              {profile.bio}
+            </p>
+          )}
         </div>
 
         {/* Compass view toggle + chart */}

@@ -19,6 +19,7 @@ import {
     getFlashcardDeck,
     getFlashcardDecks,
     getFlashcardProgress,
+    getCompletedBadges,
     getFrequencyPreference,
     getHistory,
     getIncomingRequests,
@@ -56,14 +57,14 @@ import {
 import { AXIS_KEYS, axisLabel, t } from "@/lib/i18n";
 import { useAppStore } from "@/lib/store";
 
-import { ArrowDownRight, ArrowLeft, ArrowUpRight, BarChart3, BookOpen, Check, CircleCheckBig, Clock, Download, ExternalLink, Eye, EyeOff, GitCompare, GraduationCap, Link, Loader2, Lock, MessageCircle, MessageSquare, Minus, Puzzle, RotateCcw, Scan, Send, Share2, Shield, Swords, Trophy, UserPlus, Users, Wallet, X, Zap } from "lucide-react";
+import { ArrowDownRight, ArrowLeft, ArrowUpRight, BarChart3, BookOpen, Check, CircleCheckBig, Clock, Copy, Download, ExternalLink, Eye, EyeOff, GitCompare, GraduationCap, Link, Loader2, Lock, MessageCircle, MessageSquare, Minus, Puzzle, RotateCcw, Scan, Send, Share2, Shield, Swords, Trophy, User, UserPlus, Users, Wallet, X, Zap } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSignMessage } from "wagmi";
 import { BadgeCard } from "@/components/badge-card";
 import { FlashcardReview } from "@/components/flashcard-review";
 
-type Tab = "compass" | "session" | "history" | "community" | "chat" | "wallet" | "learn";
+type Tab = "compass" | "session" | "history" | "community" | "chat" | "wallet" | "learn" | "profile";
 
 interface Snapshot {
   id: string;
@@ -209,6 +210,13 @@ function DashboardContent() {
   const [matchThreshold, setMatchThreshold] = useState(0.8);
   const [settingsSaved, setSettingsSaved] = useState(false);
 
+  // Profile tab state
+  const [profileBio, setProfileBio] = useState("");
+  const [profileDisplayName, setProfileDisplayName] = useState("");
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [profileLinkCopied, setProfileLinkCopied] = useState(false);
+  const [profileBadges, setProfileBadges] = useState<{ code: string; icon: string; titleFa: string; titleEn: string }[]>([]);
+
   // Connection state
   const [incomingRequests, setIncomingRequests] = useState<IncomingRequest[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
@@ -287,7 +295,7 @@ function DashboardContent() {
 
         // Network features — skip for guest users
         if (!isGuest) {
-          const [walletData, freqData, matchSettingsData, incomingData, connectionsData, pokesData, pokeCountData, chatThreadsData, unseenMsgData] = await Promise.all([
+          const [walletData, freqData, matchSettingsData, incomingData, connectionsData, pokesData, pokeCountData, chatThreadsData, unseenMsgData, badgesData] = await Promise.all([
             getWallet(user!.id).catch(() => null),
             getFrequencyPreference().catch(() => null),
             getMatchSettings().catch(() => null),
@@ -297,8 +305,10 @@ function DashboardContent() {
             getUnseenPokeCount().catch(() => ({ count: 0 })),
             getChatThreads().catch(() => []),
             getUnseenMessageCount().catch(() => ({ count: 0 })),
+            getCompletedBadges(user!.id).catch(() => []),
           ]);
           setWallet(walletData);
+          setProfileBadges(badgesData ?? []);
           if (freqData?.frequencyPreference) {
             setFrequency(freqData.frequencyPreference);
           }
@@ -306,6 +316,8 @@ function DashboardContent() {
             setSharingMode(matchSettingsData.sharingMode ?? "GHOST");
             setDisplayName(matchSettingsData.displayName ?? "");
             setMatchThreshold(matchSettingsData.matchThreshold ?? 0.8);
+            setProfileDisplayName(matchSettingsData.displayName ?? "");
+            setProfileBio(matchSettingsData.bio ?? "");
           }
           setIncomingRequests(incomingData ?? []);
           setConnections(connectionsData ?? []);
@@ -704,6 +716,7 @@ function DashboardContent() {
     { id: "community", label: t("tab_community", language), badge: unseenPokeCount },
     { id: "chat", label: t("tab_chat", language), badge: unseenMessageCount },
     { id: "wallet", label: t("tab_wallet", language) },
+    { id: "profile", label: t("tab_profile", language) },
   ];
 
   return (
@@ -2284,6 +2297,159 @@ function DashboardContent() {
               {t("no_wallet", language)}
             </p>
           )}
+        </div>
+        )
+      )}
+
+      {/* Profile tab */}
+      {tab === "profile" && (
+        isGuest ? (
+          <div className="card p-8 flex flex-col items-center justify-center gap-4 text-center">
+            <User size={32} strokeWidth={1.5} style={{ color: "var(--text-muted)" }} />
+            <h3 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
+              {t("guest_connect_title", language)}
+            </h3>
+            <p className="text-sm max-w-xs" style={{ color: "var(--text-secondary)" }}>
+              {t("guest_connect_wallet", language)}
+            </p>
+            <button
+              onClick={() => { useAppStore.getState().logout(); router.push("/connect"); }}
+              className="btn-primary flex items-center gap-2 px-6 py-2.5 text-sm"
+            >
+              <Wallet size={16} strokeWidth={1.5} />
+              {t("connect_wallet", language)}
+            </button>
+          </div>
+        ) : (
+        <div className="space-y-6">
+          {/* Display name */}
+          <div className="card p-5 space-y-4">
+            <div>
+              <label className="text-xs block mb-1" style={{ color: "var(--text-secondary)" }}>
+                {t("display_name", language)}
+              </label>
+              <input
+                type="text"
+                value={profileDisplayName}
+                onChange={(e) => { setProfileDisplayName(e.target.value); setProfileSaved(false); }}
+                placeholder={t("display_name_placeholder", language)}
+                maxLength={40}
+                className="w-full rounded-xl px-4 py-2 text-sm outline-none min-h-[44px]"
+                style={{
+                  background: "var(--bg-card)",
+                  border: "1px solid var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+              />
+            </div>
+
+            {/* Bio */}
+            <div>
+              <label className="text-xs block mb-1" style={{ color: "var(--text-secondary)" }}>
+                {t("profile_bio", language)}
+              </label>
+              <textarea
+                value={profileBio}
+                onChange={(e) => { setProfileBio(e.target.value); setProfileSaved(false); }}
+                placeholder={t("profile_bio_placeholder", language)}
+                maxLength={280}
+                rows={3}
+                className="w-full rounded-xl px-4 py-2 text-sm outline-none resize-none"
+                style={{
+                  background: "var(--bg-card)",
+                  border: "1px solid var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+              />
+              <p className="text-[10px] text-right mt-0.5" style={{ color: "var(--text-muted)" }}>
+                {profileBio.length}/280
+              </p>
+            </div>
+
+            {/* Save button */}
+            <button
+              onClick={async () => {
+                await updateMatchSettings({
+                  displayName: profileDisplayName || undefined,
+                  bio: profileBio || undefined,
+                });
+                // Sync displayName back to community tab state
+                setDisplayName(profileDisplayName);
+                setProfileSaved(true);
+                setTimeout(() => setProfileSaved(false), 2000);
+              }}
+              className="btn-primary text-sm py-2 px-6 w-full justify-center flex items-center gap-1.5"
+            >
+              {profileSaved ? (
+                <><Check size={14} strokeWidth={1.5} /> {t("profile_saved", language)}</>
+              ) : (
+                t("profile_save", language)
+              )}
+            </button>
+          </div>
+
+          {/* Wallet address */}
+          <div className="card p-5">
+            <label className="text-xs block mb-1" style={{ color: "var(--text-secondary)" }}>
+              {t("profile_wallet_address", language)}
+            </label>
+            <p className="text-xs break-all font-mono" style={{ color: "var(--text-muted)" }}>
+              {user?.walletAddress}
+            </p>
+          </div>
+
+          {/* Completed badges */}
+          {profileBadges.length > 0 && (
+            <div className="card p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <GraduationCap size={18} strokeWidth={1.5} style={{ color: "var(--accent-primary)" }} />
+                <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {t("profile_badges", language)}
+                </h3>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {profileBadges.map((b) => (
+                  <span
+                    key={b.code}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+                    style={{
+                      background: "var(--bg-elevated)",
+                      color: "var(--text-secondary)",
+                      border: "1px solid var(--border-color)",
+                    }}
+                  >
+                    <span>{b.icon}</span>
+                    {language === "fa" ? b.titleFa : b.titleEn}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Share profile */}
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}/profile/${user?.id}`);
+                setProfileLinkCopied(true);
+                setTimeout(() => setProfileLinkCopied(false), 2000);
+              }}
+              className="btn-outline text-sm py-2 px-5 flex-1 justify-center flex items-center gap-1.5"
+            >
+              {profileLinkCopied ? (
+                <><Check size={14} strokeWidth={1.5} /> {t("profile_link_copied", language)}</>
+              ) : (
+                <><Copy size={14} strokeWidth={1.5} /> {t("profile_share_link", language)}</>
+              )}
+            </button>
+            <button
+              onClick={() => router.push(`/profile/${user?.id}`)}
+              className="btn-outline text-sm py-2 px-5 flex-1 justify-center flex items-center gap-1.5"
+            >
+              <ExternalLink size={14} strokeWidth={1.5} />
+              {t("profile_view_public", language)}
+            </button>
+          </div>
         </div>
         )
       )}

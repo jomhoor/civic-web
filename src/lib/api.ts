@@ -168,6 +168,7 @@ export async function getMatchSettings() {
 export async function updateMatchSettings(settings: {
   sharingMode?: string;
   displayName?: string;
+  bio?: string;
   matchThreshold?: number;
 }) {
   const { data } = await api.post("/matches/settings", settings);
