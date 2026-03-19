@@ -5,8 +5,10 @@
  * computes shared secrets via ECDH, and encrypts/decrypts
  * messages with AES-256-GCM.
  *
- * SECURITY: The chat private key is NEVER persisted.
+ * SECURITY: The chat private key is NEVER persisted to disk.
  * It lives only in JS memory for the duration of the session.
+ * The key is deterministic: signing the fixed CHAT_SIGN_MESSAGE
+ * with the same wallet always produces the same keypair.
  */
 
 import nacl from "tweetnacl";
@@ -23,6 +25,7 @@ const sharedSecretCache = new Map<string, Uint8Array>();
 
 /**
  * The fixed message the wallet signs to derive chat keys.
+ * Deterministic: same wallet + same message = same signature = same key.
  */
 export function getChatSignMessage(): string {
   return CHAT_SIGN_MESSAGE;

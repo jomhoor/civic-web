@@ -1,6 +1,7 @@
 "use client";
 
-import { createGuestSession, getNonce, verifySiwe } from "@/lib/api";
+import { createGuestSession, getNonce, setChatPublicKey, verifySiwe } from "@/lib/api";
+import { deriveChatKeyPair, getChatSignMessage, getPublicKeyBase64 } from "@/lib/chat-crypto";
 import { t } from "@/lib/i18n";
 import {
   getJomhoorAddress,
@@ -76,7 +77,7 @@ export default function ConnectPage() {
       });
       const messageStr = siweMessage.prepareMessage();
 
-      // 3. Sign
+      // 3. Sign SIWE
       const signature = await signMessageAsync({ message: messageStr });
 
       // 4. Verify with backend
@@ -84,7 +85,17 @@ export default function ConnectPage() {
       const result = await verifySiwe(messageStr, signature);
       setAuth(result.user, result.token);
 
-      // 5. Navigate — skip onboarding for returning users
+      // 5. Sign fixed chat message to derive deterministic E2E encryption key
+      try {
+        const chatSig = await signMessageAsync({ message: getChatSignMessage() });
+        await deriveChatKeyPair(chatSig);
+        const pubB64 = getPublicKeyBase64();
+        if (pubB64) await setChatPublicKey(pubB64);
+      } catch (e) {
+        console.warn("Chat key derivation failed (non-fatal):", e);
+      }
+
+      // 6. Navigate — skip onboarding for returning users
       const hasOnboarded = useAppStore.getState().hasOnboarded;
       router.push(hasOnboarded ? "/dashboard" : "/onboarding");
     } catch (err: unknown) {
@@ -165,7 +176,19 @@ export default function ConnectPage() {
         const result = await verifySiwe(messageStr, signature);
         setAuth(result.user, result.token);
 
-        // 5. Navigate
+        // 5. Sign fixed chat message via bridge for deterministic E2E key
+        try {
+          const chatSig = await signMessageViaBridge(getChatSignMessage());
+          if (!cancelled) {
+            await deriveChatKeyPair(chatSig);
+            const pubB64 = getPublicKeyBase64();
+            if (pubB64) await setChatPublicKey(pubB64);
+          }
+        } catch (e) {
+          console.warn("[JomhoorBridge] Chat key derivation failed (non-fatal):", e);
+        }
+
+        // 6. Navigate
         const hasOnboarded = useAppStore.getState().hasOnboarded;
         router.push(hasOnboarded ? "/dashboard" : "/onboarding");
       } catch (err) {

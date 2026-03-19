@@ -52,7 +52,7 @@ import {
     encryptMessage,
     getChatSignMessage,
     getPublicKeyBase64,
-    isChatReady
+    isChatReady,
 } from "@/lib/chat-crypto";
 import { AXIS_KEYS, axisLabel, t } from "@/lib/i18n";
 import { useAppStore } from "@/lib/store";
@@ -205,7 +205,7 @@ function DashboardContent() {
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
 
   // Privacy settings state
-  const [sharingMode, setSharingMode] = useState<string>("GHOST");
+  const [sharingMode, setSharingMode] = useState<string>("PUBLIC");
   const [displayName, setDisplayName] = useState("");
   const [matchThreshold, setMatchThreshold] = useState(0.8);
   const [settingsSaved, setSettingsSaved] = useState(false);
@@ -313,7 +313,7 @@ function DashboardContent() {
             setFrequency(freqData.frequencyPreference);
           }
           if (matchSettingsData) {
-            setSharingMode(matchSettingsData.sharingMode ?? "GHOST");
+            setSharingMode(matchSettingsData.sharingMode ?? "PUBLIC");
             setDisplayName(matchSettingsData.displayName ?? "");
             setMatchThreshold(matchSettingsData.matchThreshold ?? 0.8);
             setProfileDisplayName(matchSettingsData.displayName ?? "");
@@ -342,13 +342,14 @@ function DashboardContent() {
 
   // ─── E2E Chat helpers ───────────────────────────────────────
 
-  /** Enable chat by signing a message to derive encryption keys */
+  /** Enable chat by signing the fixed message to derive encryption keys.
+   *  Usually already done at connect time; this is the fallback. */
   const enableChat = useCallback(async () => {
     if (chatSigning || chatReady) return;
     setChatSigning(true);
     try {
       const sig = await signMessageAsync({ message: getChatSignMessage() });
-      const kp = await deriveChatKeyPair(sig);
+      await deriveChatKeyPair(sig);
       // Upload public key to server
       const pubB64 = getPublicKeyBase64();
       if (pubB64) {
@@ -457,6 +458,13 @@ function DashboardContent() {
       })
       .catch(() => {});
   }, [tab, unseenPokeCount]);
+
+  // Auto-load mirror matches when community tab is opened
+  useEffect(() => {
+    if (tab !== "community" || matches.length > 0 || matchesLoading) return;
+    setMatchMode("mirror");
+    loadMatches("mirror");
+  }, [tab]);
 
   const handleShareProfile = useCallback(async () => {
     if (!user) return;
@@ -708,16 +716,19 @@ function DashboardContent() {
 
   if (!user) return null;
 
-  const tabs: { id: Tab; label: string; badge?: number }[] = [
+  const tabs: { id: Tab; label: string; badge?: number; minTier?: number }[] = [
     { id: "compass", label: t("tab_compass", language) },
     { id: "session", label: t("tab_session", language) },
-    { id: "history", label: t("tab_history", language) },
+    { id: "history", label: t("tab_history", language), minTier: 1 },
     { id: "learn", label: t("tab_learn", language) },
-    { id: "community", label: t("tab_community", language), badge: unseenPokeCount },
-    { id: "chat", label: t("tab_chat", language), badge: unseenMessageCount },
-    { id: "wallet", label: t("tab_wallet", language) },
-    { id: "profile", label: t("tab_profile", language) },
+    { id: "community", label: t("tab_community", language), badge: unseenPokeCount, minTier: 1 },
+    { id: "chat", label: t("tab_chat", language), badge: unseenMessageCount, minTier: 1 },
+    { id: "wallet", label: t("tab_wallet", language), minTier: 1 },
+    { id: "profile", label: t("tab_profile", language), minTier: 1 },
   ];
+
+  // Tier 0 = guest, Tier 1 = wallet connected
+  const userTier = isGuest ? 0 : 1;
 
   return (
     <main className="min-h-screen px-4 py-6 sm:px-6 sm:py-12 max-w-3xl mx-auto">
@@ -732,28 +743,36 @@ function DashboardContent() {
           className="inline-flex gap-1 rounded-xl p-1 min-w-full"
           style={{ background: "var(--bg-card)" }}
         >
-        {tabs.map((tb) => (
+        {tabs.map((tb) => {
+          const locked = (tb.minTier ?? 0) > userTier;
+          return (
           <button
             key={tb.id}
             onClick={() => {
-              setTab(tb.id);
+              if (locked) {
+                router.push("/connect");
+              } else {
+                setTab(tb.id);
+              }
             }}
             className="relative shrink-0 flex-1 py-2.5 sm:py-2 px-3 sm:px-4 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap"
             style={{
               background:
-                tab === tb.id ? "var(--accent-gradient)" : "transparent",
-              color: tab === tb.id ? "#111111" : "var(--text-secondary)",
-              fontWeight: tab === tb.id ? 700 : 500,
+                tab === tb.id && !locked ? "var(--accent-gradient)" : "transparent",
+              color: locked ? "var(--text-muted)" : tab === tb.id ? "#111111" : "var(--text-secondary)",
+              fontWeight: tab === tb.id && !locked ? 700 : 500,
+              opacity: locked ? 0.5 : 1,
             }}
           >
-            {tb.label}
-            {tb.badge && tb.badge > 0 ? (
+            {locked ? "🔒 " : ""}{tb.label}
+            {!locked && tb.badge && tb.badge > 0 ? (
               <span className="absolute -top-1 -right-1 sm:top-0 sm:right-0 min-w-[16px] h-4 flex items-center justify-center rounded-full text-[10px] font-bold px-1" style={{ background: "var(--error)", color: "#fff" }}>
                 {tb.badge}
               </span>
             ) : null}
           </button>
-        ))}
+          );
+        })}
         </div>
       </div>
 
@@ -1912,7 +1931,7 @@ function DashboardContent() {
         ) : (
         <div className="space-y-4">
           {!chatReady ? (
-            /* Enable chat prompt */
+            /* Enable chat prompt — signs fixed message to derive encryption keys */
             <div className="card p-8 text-center space-y-4">
               <div className="w-16 h-16 mx-auto rounded-full flex items-center justify-center" style={{ background: "var(--accent-gradient-soft)" }}>
                 <Lock size={28} strokeWidth={1.5} style={{ color: "var(--accent-primary)" }} />
