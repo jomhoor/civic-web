@@ -48,16 +48,16 @@ export default function ConnectPage() {
     setError("");
 
     try {
-      // 0. Force-switch to Polygon — this is a no-op if already on 137,
-      //    but ensures the connector actually moves to the right chain.
-      setStatus("switching");
-      try {
-        await switchChainAsync({ chainId: polygon.id });
-      } catch (switchErr: unknown) {
-        const msg = switchErr instanceof Error ? switchErr.message : "";
-        // "already pending" or similar means it's fine
-        if (!msg.toLowerCase().includes("already") && !msg.toLowerCase().includes("same")) {
-          throw switchErr;
+      // 0. Switch to Polygon only if not already on it
+      if (chainId !== polygon.id) {
+        setStatus("switching");
+        try {
+          await switchChainAsync({ chainId: polygon.id });
+        } catch (switchErr: unknown) {
+          const msg = switchErr instanceof Error ? switchErr.message : "";
+          if (!msg.toLowerCase().includes("already") && !msg.toLowerCase().includes("same")) {
+            throw switchErr;
+          }
         }
       }
 
