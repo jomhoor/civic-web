@@ -25,8 +25,8 @@ export default async function OGImage({
     const res = await fetch(`${API_BASE}/flashcards/decks/${encodeURIComponent(code)}`);
     if (res.ok) {
       const data = await res.json();
-      // Strip ZWNJ (U+200C) — Satori's bidi algorithm reverses segments around it
-      titleFa = String(data.titleFa ?? "").replace(/\u200C/g, "");
+      // Replace ZWNJ (U+200C) with space — Satori's bidi algorithm reverses segments around ZWNJ
+      titleFa = String(data.titleFa ?? "").replace(/\u200C/g, " ");
       titleEn = String(data.titleEn ?? "");
       cardCount = data.cards?.length ?? 0;
     }
