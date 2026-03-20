@@ -156,7 +156,11 @@ export default function LearnDeckPage({ params }: { params: Promise<{ code: stri
                   </p>
                   {card.articleRef && (
                     <a
-                      href={card.articleRef}
+                      href={(() => {
+                        const m = card.articleRef.match(/Article\s*(\d+)/i);
+                        if (m) return `https://www.un.org/en/about-us/universal-declaration-of-human-rights#article-${m[1]}`;
+                        return deck.sourceUrl || "#";
+                      })()}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-xs mt-2 hover:underline"
