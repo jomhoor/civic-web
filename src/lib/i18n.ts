@@ -328,6 +328,7 @@ const en = {
   flashcard_of: "of",
   flashcard_back_to_decks: "Back to decks",
   flashcard_article: "Article",
+  flashcard_share: "Share",
 };
 
 const fa: typeof en = {
@@ -654,6 +655,7 @@ const fa: typeof en = {
   flashcard_of: "از",
   flashcard_back_to_decks: "بازگشت به مجموعه‌ها",
   flashcard_article: "ماده",
+  flashcard_share: "اشتراک‌گذاری",
 };
 
 const dictionaries: Record<Language, typeof en> = { en, fa };
