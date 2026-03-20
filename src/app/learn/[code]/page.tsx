@@ -14,6 +14,7 @@ interface DeckData {
   titleEn: string;
   description?: string;
   icon: string;
+  sourceUrl?: string;
   cards: { id: string; front: string; back: string; articleRef?: string; difficulty: string; order: number }[];
 }
 

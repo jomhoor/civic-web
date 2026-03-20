@@ -198,6 +198,7 @@ const en = {
   copy_id: "Copy ID",
   joined: "Joined",
   loading: "Loading",
+  profile_badges: "Completed Decks",
 
   // Community / Matchmaking
   tab_community: "Community",
@@ -525,6 +526,7 @@ const fa: typeof en = {
   copy_id: "کپی شناسه",
   joined: "عضویت",
   loading: "بارگذاری",
+  profile_badges: "مجموعه‌های تکمیل‌شده",
 
   // Community / Matchmaking
   tab_community: "جامعه",
