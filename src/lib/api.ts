@@ -170,7 +170,6 @@ export async function updateMatchSettings(settings: {
   displayName?: string;
   bio?: string;
   matchThreshold?: number;
-  bio?: string;
 }) {
   const { data } = await api.post("/matches/settings", settings);
   return data;
