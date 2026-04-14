@@ -165,7 +165,7 @@ function DashboardContent() {
   const isGuest = useAppStore((s) => s.isGuest);
   const [tab, setTab] = useState<Tab>(() => {
     const param = searchParams.get("tab");
-    const valid: Tab[] = ["compass", "session", "history", "community", "chat", "wallet", "learn"];
+    const valid: Tab[] = ["compass", "session", "history", "community", "chat", "wallet", "learn", "profile"];
     if (param && valid.includes(param as Tab)) return param as Tab;
     return isGuest ? "session" : "compass";
   });
@@ -445,7 +445,7 @@ function DashboardContent() {
   useEffect(() => {
     const urlTab = searchParams.get("tab");
     const urlUser = searchParams.get("user");
-    const valid: Tab[] = ["compass", "session", "history", "community", "chat", "wallet", "learn"];
+    const valid: Tab[] = ["compass", "session", "history", "community", "chat", "wallet", "learn", "profile"];
     if (urlTab && valid.includes(urlTab as Tab)) {
       setTab(urlTab as Tab);
     }
@@ -2495,6 +2495,166 @@ function DashboardContent() {
           {t("analytics_explore", language)}
         </button>
       </div>
+
+      {/* Profile tab */}
+      {tab === "profile" && (
+        isGuest ? (
+          <div className="card p-8 flex flex-col items-center justify-center gap-4 text-center">
+            <User size={32} strokeWidth={1.5} style={{ color: "var(--text-muted)" }} />
+            <h3 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
+              {t("guest_connect_title", language)}
+            </h3>
+            <p className="text-sm max-w-xs" style={{ color: "var(--text-secondary)" }}>
+              {t("guest_connect_wallet", language)}
+            </p>
+            <button
+              onClick={() => { useAppStore.getState().logout(); router.push("/connect"); }}
+              className="btn-primary flex items-center gap-2 px-6 py-2.5 text-sm"
+            >
+              <Wallet size={16} strokeWidth={1.5} />
+              {t("connect_wallet", language)}
+            </button>
+          </div>
+        ) : (
+        <div className="space-y-6">
+          {/* Display name */}
+          <div className="card p-5 space-y-4">
+            <div>
+              <label className="text-xs block mb-1" style={{ color: "var(--text-secondary)" }}>
+                {t("display_name", language)}
+              </label>
+              <input
+                type="text"
+                value={profileDisplayName}
+                onChange={(e) => { setProfileDisplayName(e.target.value); setProfileSaved(false); }}
+                placeholder={t("display_name_placeholder", language)}
+                maxLength={40}
+                className="w-full rounded-xl px-4 py-2 text-sm outline-none min-h-[44px]"
+                style={{
+                  background: "var(--bg-card)",
+                  border: "1px solid var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+              />
+            </div>
+
+            {/* Bio */}
+            <div>
+              <label className="text-xs block mb-1" style={{ color: "var(--text-secondary)" }}>
+                {t("profile_bio", language)}
+              </label>
+              <textarea
+                value={profileBio}
+                onChange={(e) => { setProfileBio(e.target.value); setProfileSaved(false); }}
+                placeholder={t("profile_bio_placeholder", language)}
+                maxLength={280}
+                rows={3}
+                className="w-full rounded-xl px-4 py-2 text-sm outline-none resize-none"
+                style={{
+                  background: "var(--bg-card)",
+                  border: "1px solid var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+              />
+              <p className="text-[10px] text-right mt-0.5" style={{ color: "var(--text-muted)" }}>
+                {profileBio.length}/280
+              </p>
+            </div>
+
+            {/* Save button */}
+            <button
+              onClick={async () => {
+                await updateMatchSettings({
+                  displayName: profileDisplayName || undefined,
+                  bio: profileBio || undefined,
+                });
+                // Sync displayName back to community tab state
+                setDisplayName(profileDisplayName);
+                setProfileSaved(true);
+                setTimeout(() => setProfileSaved(false), 2000);
+              }}
+              className="btn-primary text-sm py-2 px-6 w-full justify-center flex items-center gap-1.5"
+            >
+              {profileSaved ? (
+                <><Check size={14} strokeWidth={1.5} /> {t("profile_saved", language)}</>
+              ) : (
+                t("profile_save", language)
+              )}
+            </button>
+          </div>
+
+          {/* Wallet address */}
+          <div className="card p-5">
+            <label className="text-xs block mb-1" style={{ color: "var(--text-secondary)" }}>
+              {t("profile_wallet_address", language)}
+            </label>
+            <p className="text-xs break-all font-mono" style={{ color: "var(--text-muted)" }}>
+              {user?.walletAddress}
+            </p>
+          </div>
+
+          {/* Completed badges */}
+          {profileBadges.length > 0 && (
+            <div className="card p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <GraduationCap size={18} strokeWidth={1.5} style={{ color: "var(--accent-primary)" }} />
+                <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {t("profile_badges", language)}
+                </h3>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {profileBadges.map((b) => (
+                  <span
+                    key={b.code}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+                    style={{ background: "var(--accent-gradient-soft)", color: "var(--accent-primary)" }}
+                  >
+                    {b.icon} {language === "fa" ? b.titleFa : b.titleEn}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Share profile link */}
+          <div className="card p-5">
+            <button
+              onClick={async () => {
+                const profileUrl = `${window.location.origin}/profile/${user!.id}`;
+                await navigator.clipboard.writeText(profileUrl);
+                setProfileLinkCopied(true);
+                setTimeout(() => setProfileLinkCopied(false), 2000);
+              }}
+              className="btn-outline w-full flex items-center justify-center gap-2 text-sm py-2.5"
+            >
+              {profileLinkCopied ? (
+                <><Check size={14} strokeWidth={1.5} /> {t("profile_link_copied", language)}</>
+              ) : (
+                <><Copy size={14} strokeWidth={1.5} /> {t("profile_share_link", language)}</>
+              )}
+            </button>
+            <button
+              onClick={() => router.push(`/profile/${user!.id}`)}
+              className="mt-2 text-xs w-full text-center underline"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {t("profile_view_public", language)}
+            </button>
+          </div>
+
+          {/* Member since */}
+          {user?.createdAt && (
+            <p className="text-xs text-center" style={{ color: "var(--text-muted)" }}>
+              {t("profile_member_since", language)}{" "}
+              {new Date(user.createdAt).toLocaleDateString(language === "fa" ? "fa-IR" : "en-US", {
+                year: "numeric",
+                month: "long",
+              })}
+            </p>
+          )}
+        </div>
+        )
+      )}
 
       {/* Wallet Required Modal */}
       {walletPrompt && (
