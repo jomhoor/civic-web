@@ -142,6 +142,7 @@ export default async function OGImage({
   let dimensions: Record<string, number> = {};
   let displayName: string | null = null;
   let wallet = "";
+  let badges: { code: string; icon: string; titleEn: string }[] = [];
 
   try {
     const res = await fetch(`${API_BASE}/compass/profile/${userId}`, {
@@ -155,6 +156,18 @@ export default async function OGImage({
     }
   } catch {
     // Fallback to empty compass
+  }
+
+  // Fetch completed badges
+  try {
+    const badgeRes = await fetch(`${API_BASE}/flashcards/badges/${userId}`, {
+      next: { revalidate: 300 },
+    });
+    if (badgeRes.ok) {
+      badges = await badgeRes.json();
+    }
+  } catch {
+    // No badges
   }
 
   // Normalize dimension values from [-1, 1] to [0, 1]
@@ -543,6 +556,38 @@ export default async function OGImage({
           })()}
 
           {/* URL watermark */}
+          {badges.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "6px",
+                marginTop: "16px",
+                maxWidth: "400px",
+              }}
+            >
+              {badges.slice(0, 6).map((b) => (
+                <div
+                  key={b.code}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "4px 10px",
+                    borderRadius: "12px",
+                    background: "rgba(99,102,241,0.15)",
+                    border: "1px solid rgba(99,102,241,0.3)",
+                    fontSize: "12px",
+                    color: "#A5B4FC",
+                    fontWeight: 600,
+                  }}
+                >
+                  <span>{b.icon}</span>
+                  <span>{b.titleEn}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <div
             style={{
               fontSize: "13px",

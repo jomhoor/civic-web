@@ -39,8 +39,6 @@ export function FlashcardReview({
   const language = useAppStore((s) => s.language);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
-  const [buttonsEnabled, setButtonsEnabled] = useState(false);
-  const [reviewStartTime, setReviewStartTime] = useState(Date.now());
   const [localMastered, setLocalMastered] = useState<Set<string>>(new Set(masteredCardIds));
   const [saving, setSaving] = useState(false);
 
@@ -50,26 +48,24 @@ export function FlashcardReview({
   const allMastered = remainingCards.length === 0;
 
   useEffect(() => {
-    setReviewStartTime(Date.now());
     setShowAnswer(false);
-    setButtonsEnabled(false);
   }, [currentIndex]);
 
-  // Enable rating buttons after 3 seconds of showing the answer
+  // Timer starts when answer is revealed, not when card appears
+  const [canRate, setCanRate] = useState(false);
   useEffect(() => {
-    if (!showAnswer) {
-      setButtonsEnabled(false);
-      return;
+    if (showAnswer) {
+      setCanRate(false);
+      const timer = setTimeout(() => setCanRate(true), 1500);
+      return () => clearTimeout(timer);
+    } else {
+      setCanRate(false);
     }
-    const timer = setTimeout(() => setButtonsEnabled(true), 3000);
-    return () => clearTimeout(timer);
-  }, [showAnswer]);
+  }, [showAnswer, currentIndex]);
 
   const handleRating = useCallback(
     async (status: string) => {
-      if (!currentCard || saving) return;
-      const elapsed = Date.now() - reviewStartTime;
-      if (elapsed < 3000) return; // anti-cheat: minimum 3 seconds
+      if (!currentCard || saving || !canRate) return;
 
       setSaving(true);
       try {
@@ -94,7 +90,7 @@ export function FlashcardReview({
         setSaving(false);
       }
     },
-    [currentCard, saving, reviewStartTime, onReview, cards, localMastered]
+    [currentCard, saving, canRate, onReview, cards, localMastered]
   );
 
   // Check completion
@@ -141,7 +137,7 @@ export function FlashcardReview({
       </div>
 
       {/* Card */}
-      <div className="card p-6 sm:p-8 min-h-[280px] flex flex-col">
+      <div className="card p-6 sm:p-8 min-h-[280px] flex flex-col" style={{ overflow: "visible" }}>
         {/* Article reference tag */}
         {currentCard.articleRef && (
           <span
@@ -189,43 +185,31 @@ export function FlashcardReview({
             </p>
 
             {/* Rating buttons */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2" style={{ position: "relative", zIndex: 10 }}>
               <button
+                type="button"
                 onClick={() => handleRating("SEEN")}
-                disabled={saving || !buttonsEnabled}
-                className="py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all"
-                style={{
-                  background: "rgba(239,68,68,0.15)",
-                  color: "var(--error)",
-                  opacity: buttonsEnabled ? 1 : 0.4,
-                  cursor: buttonsEnabled ? "pointer" : "not-allowed",
-                }}
+                disabled={saving || !canRate}
+                className="px-2 py-4 rounded-lg text-xs sm:text-sm font-medium transition-all cursor-pointer w-full active:scale-95"
+                style={{ background: "rgba(239,68,68,0.15)", color: "var(--error)", opacity: canRate ? 1 : 0.4 }}
               >
                 {t("flashcard_didnt_know", language)}
               </button>
               <button
+                type="button"
                 onClick={() => handleRating("LEARNING")}
-                disabled={saving || !buttonsEnabled}
-                className="py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all"
-                style={{
-                  background: "rgba(245,158,11,0.15)",
-                  color: "var(--warning, #f59e0b)",
-                  opacity: buttonsEnabled ? 1 : 0.4,
-                  cursor: buttonsEnabled ? "pointer" : "not-allowed",
-                }}
+                disabled={saving || !canRate}
+                className="px-2 py-4 rounded-lg text-xs sm:text-sm font-medium transition-all cursor-pointer w-full active:scale-95"
+                style={{ background: "rgba(245,158,11,0.15)", color: "var(--warning, #f59e0b)", opacity: canRate ? 1 : 0.4 }}
               >
                 {t("flashcard_almost", language)}
               </button>
               <button
+                type="button"
                 onClick={() => handleRating("MASTERED")}
-                disabled={saving || !buttonsEnabled}
-                className="py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all"
-                style={{
-                  background: "rgba(34,197,94,0.15)",
-                  color: "var(--success, #22c55e)",
-                  opacity: buttonsEnabled ? 1 : 0.4,
-                  cursor: buttonsEnabled ? "pointer" : "not-allowed",
-                }}
+                disabled={saving || !canRate}
+                className="px-2 py-4 rounded-lg text-xs sm:text-sm font-medium transition-all cursor-pointer w-full active:scale-95"
+                style={{ background: "rgba(34,197,94,0.15)", color: "var(--success, #22c55e)", opacity: canRate ? 1 : 0.4 }}
               >
                 {t("flashcard_knew_it", language)}
               </button>
