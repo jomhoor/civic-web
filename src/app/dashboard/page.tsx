@@ -272,6 +272,7 @@ function DashboardContent() {
   const [chatSending, setChatSending] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const [pendingChatUserId, setPendingChatUserId] = useState<string | null>(null);
 
   // Flashcard / Learn state
   const [flashcardDecks, setFlashcardDecks] = useState<any[]>([]);
@@ -407,6 +408,17 @@ function DashboardContent() {
     }
   }, [chatPendingAfterConnect, walletConnected, chatReady, chatSigning, enableChat]);
 
+  // Once chat is ready and there's a pending user, auto-load conversation
+  useEffect(() => {
+    if (chatReady && pendingChatUserId) {
+      const userId = pendingChatUserId;
+      setPendingChatUserId(null);
+      handleTabChange("chat");
+      loadConversation(userId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatReady, pendingChatUserId]);
+
   /** Load a conversation with a user and decrypt messages */
   const loadConversation = useCallback(async (otherUserId: string) => {
     if (!chatReady) return;
@@ -485,10 +497,17 @@ function DashboardContent() {
     if (urlTab && valid.includes(urlTab as Tab)) {
       setTab(urlTab as Tab);
     }
-    if (urlTab === "chat" && urlUser && chatReady) {
-      loadConversation(urlUser);
+    if (urlTab === "chat" && urlUser) {
+      if (chatReady) {
+        loadConversation(urlUser);
+      } else if (!chatSigning) {
+        setPendingChatUserId(urlUser);
+        enableChat();
+      }
     }
-  }, [searchParams, chatReady, loadConversation]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, chatReady, loadConversation, enableChat, chatSigningstive-deps
+  }, [searchParams, chatReady, loadConversation, enableChat, chatSigning]);
 
   const handleTabChange = useCallback((newTab: Tab) => {
     setTab(newTab);
@@ -1516,8 +1535,13 @@ function DashboardContent() {
                         {poke.mutual ? (
                           <button
                             onClick={() => {
-                              handleTabChange("chat");
-                              loadConversation(poke.senderId);
+                              if (!chatReady) {
+                                setPendingChatUserId(poke.senderId);
+                                enableChat();
+                              } else {
+                                handleTabChange("chat");
+                                loadConversation(poke.senderId);
+                              }
                             }}
                             className="btn-primary text-xs py-1.5 px-4 flex items-center gap-1.5"
                           >
@@ -1532,6 +1556,16 @@ function DashboardContent() {
                                 // Refresh pokes
                                 const updated = await getReceivedPokes();
                                 setReceivedPokes(updated ?? []);
+                                // If mutual, auto-enable chat and open conversation
+                                if (result.mutual) {
+                                  if (!chatReady) {
+                                    setPendingChatUserId(poke.senderId);
+                                    enableChat();
+                                  } else {
+                                    handleTabChange("chat");
+                                    loadConversation(poke.senderId);
+                                  }
+                                }
                               } catch (err) {
                                 console.error("Failed to poke back:", err);
                               }
