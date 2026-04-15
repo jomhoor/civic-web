@@ -20,17 +20,27 @@ const AXIS_KEYS = [
   "environment",
   "justice",
   "technology",
+  "openness",
+  "conscientiousness",
+  "extraversion",
+  "agreeableness",
+  "neuroticism",
 ];
 
 const AXIS_COLORS = [
-  "#0EBB90",
-  "#8CDAF5",
-  "#FEEB34",
-  "#E87461",
-  "#A78BFA",
-  "#F59E0B",
-  "#34D399",
-  "#60A5FA",
+  "#0EBB90",   // economy
+  "#8CDAF5",   // governance
+  "#FEEB34",   // civil_liberties
+  "#E87461",   // society
+  "#A78BFA",   // diplomacy
+  "#F59E0B",   // environment
+  "#34D399",   // justice
+  "#60A5FA",   // technology
+  "#FF6B9D",   // openness
+  "#22D3EE",   // conscientiousness
+  "#C084FC",   // extraversion
+  "#FB923C",   // agreeableness
+  "#F43F5E",   // neuroticism
 ];
 
 /* ── Math helpers ── */
