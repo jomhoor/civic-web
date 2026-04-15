@@ -506,7 +506,6 @@ function DashboardContent() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, chatReady, loadConversation, enableChat, chatSigningstive-deps
   }, [searchParams, chatReady, loadConversation, enableChat, chatSigning]);
 
   const handleTabChange = useCallback((newTab: Tab) => {
