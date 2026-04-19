@@ -27,6 +27,7 @@ import {
     getMatchSettings,
     getNextQuestions,
     getQuestionnaireProgress,
+    getPokeStatus,
     getReceivedPokes,
     getUnseenMessageCount,
     getUnseenPokeCount,
@@ -272,8 +273,13 @@ function DashboardContent() {
   const [chatSending, setChatSending] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [pendingChatUserId, setPendingChatUserId] = useState<string | null>(null);
   const [pendingPokeSend, setPendingPokeSend] = useState<string | null>(null);
+
+  // Poke status for match cards
+  const [pokeStatuses, setPokeStatuses] = useState<Record<string, { hasPoked: boolean; hasBeenPoked: boolean; mutual: boolean }>>({});
+  const [pokingTo, setPokingTo] = useState<string | null>(null);
 
   // Flashcard / Learn state
   const [flashcardDecks, setFlashcardDecks] = useState<any[]>([]);
@@ -512,6 +518,35 @@ function DashboardContent() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
+  // Chat polling — refresh messages every 5s when conversation is active
+  useEffect(() => {
+    if (!activeChatUser || !activeChatPublicKey || !chatReady) {
+      if (chatPollRef.current) { clearInterval(chatPollRef.current); chatPollRef.current = null; }
+      return;
+    }
+    const pubKey = activeChatPublicKey;
+    const otherUser = activeChatUser;
+
+    chatPollRef.current = setInterval(async () => {
+      try {
+        const shared = computeSharedSecret(pubKey);
+        const { messages } = await getConversation(otherUser);
+        const decrypted = messages.map((m: { id: string; senderId: string; ciphertext: string; nonce: string; createdAt: string }) => ({
+          ...m,
+          plaintext: decryptMessage(shared, m.ciphertext, m.nonce),
+        }));
+        setChatMessages(decrypted);
+        await markChatSeen(otherUser).catch(() => {});
+        const { count } = await getUnseenMessageCount().catch(() => ({ count: 0 }));
+        setUnseenMessageCount(count);
+      } catch { /* ignore poll errors */ }
+    }, 5000);
+
+    return () => {
+      if (chatPollRef.current) { clearInterval(chatPollRef.current); chatPollRef.current = null; }
+    };
+  }, [activeChatUser, activeChatPublicKey, chatReady]);
+
   // Handle URL params for deep-linking — sync tab state with URL on back/forward navigation
   useEffect(() => {
     const urlTab = searchParams.get("tab");
@@ -652,6 +687,43 @@ function DashboardContent() {
       await setFrequencyPreference(freq);
     } catch (err) {
       console.error("Failed to save frequency:", err);
+    }
+  }
+
+  // Fetch poke status for a match card (when expanding)
+  async function fetchPokeStatus(userId: string) {
+    if (pokeStatuses[userId]) return;
+    try {
+      const status = await getPokeStatus(userId);
+      setPokeStatuses((prev) => ({ ...prev, [userId]: status }));
+    } catch { /* ignore */ }
+  }
+
+  // Poke from match card
+  async function handleMatchPoke(userId: string) {
+    setPokingTo(userId);
+    try {
+      const result = await sendPoke(userId);
+      setPokeStatuses((prev) => ({
+        ...prev,
+        [userId]: {
+          hasPoked: true,
+          hasBeenPoked: prev[userId]?.hasBeenPoked ?? false,
+          mutual: result.mutual,
+        },
+      }));
+      if (result.mutual) {
+        const [pokesData, threadsData] = await Promise.all([
+          getReceivedPokes().catch(() => []),
+          getChatThreads().catch(() => []),
+        ]);
+        setReceivedPokes(pokesData ?? []);
+        setChatThreads(threadsData ?? []);
+      }
+    } catch (err) {
+      console.error("Failed to poke:", err);
+    } finally {
+      setPokingTo(null);
     }
   }
 
@@ -1756,7 +1828,11 @@ function DashboardContent() {
                   }}
                 >
                   <button
-                    onClick={() => setExpandedMatch(expandedMatch === m.userId ? null : m.userId)}
+                    onClick={() => {
+                      const newExpanded = expandedMatch === m.userId ? null : m.userId;
+                      setExpandedMatch(newExpanded);
+                      if (newExpanded) fetchPokeStatus(m.userId);
+                    }}
                     className="w-full p-4 flex items-center justify-between text-start"
                   >
                     <div className="flex items-center gap-3">
@@ -1831,68 +1907,56 @@ function DashboardContent() {
                         ))}
                       </div>
 
-                      {/* Connection action buttons */}
-                      <div className="pt-2 border-t" style={{ borderColor: "var(--border-color)" }}>
-                        {m.connectionStatus === "ACCEPTED" ? (
-                          <button
-                            onClick={() => {
-                              handleTabChange("chat");
-                              loadConversation(m.userId);
-                            }}
-                            className="btn-primary text-sm py-2 px-4 w-full flex items-center justify-center gap-2"
-                          >
-                            <Lock size={14} strokeWidth={1.5} />
-                            {t("start_chat", language)}
-                          </button>
-                        ) : m.connectionStatus === "PENDING" && m.connectionDirection === "sent" ? (
-                          <div className="flex gap-2">
-                            <span className="flex-1 flex items-center justify-center gap-1.5 text-sm py-2 rounded-xl" style={{ background: "var(--component-primary)", color: "var(--text-muted)" }}>
-                              <Clock size={14} strokeWidth={1.5} />
-                              {t("pending_btn", language)}
-                            </span>
+                      {/* Poke + Chat action */}
+                      <div className="pt-2 border-t space-y-2" style={{ borderColor: "var(--border-color)" }}>
+                        {(() => {
+                          const ps = pokeStatuses[m.userId];
+                          if (ps?.mutual) {
+                            return (
+                              <button
+                                onClick={() => {
+                                  handleTabChange("chat");
+                                  loadConversation(m.userId);
+                                }}
+                                className="btn-primary text-sm py-2 px-4 w-full flex items-center justify-center gap-2"
+                              >
+                                <Lock size={14} strokeWidth={1.5} />
+                                {t("start_chat", language)}
+                              </button>
+                            );
+                          }
+                          if (ps?.hasPoked) {
+                            return (
+                              <span className="flex items-center justify-center gap-1.5 text-sm py-2 rounded-xl w-full" style={{ background: "var(--component-primary)", color: "var(--text-muted)" }}>
+                                <Check size={14} strokeWidth={1.5} />
+                                {t("poke_sent", language)}
+                              </span>
+                            );
+                          }
+                          return (
                             <button
-                              onClick={() => m.connectionId && handleCancelConnection(m.connectionId)}
-                              className="btn-outline text-sm py-2 px-4 flex items-center gap-1.5"
-                              style={{ color: "var(--error)" }}
+                              onClick={() => handleMatchPoke(m.userId)}
+                              className="btn-primary text-sm py-2 px-4 w-full flex items-center justify-center gap-1.5"
+                              disabled={pokingTo === m.userId}
                             >
-                              <X size={14} strokeWidth={1.5} />
-                              {t("cancel_btn", language)}
+                              {pokingTo === m.userId ? (
+                                <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />
+                              ) : (
+                                <Zap size={14} strokeWidth={1.5} />
+                              )}
+                              {ps?.hasBeenPoked ? t("poke_back", language) : t("poke_btn", language)}
                             </button>
-                          </div>
-                        ) : m.connectionStatus === "PENDING" && m.connectionDirection === "received" ? (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => m.connectionId && handleRespond(m.connectionId, "ACCEPTED")}
-                              className="btn-primary text-sm py-2 px-4 flex-1 flex items-center justify-center gap-1.5"
-                              disabled={respondingTo === m.connectionId}
-                            >
-                              <Check size={14} strokeWidth={1.5} />
-                              {t("accept_btn", language)}
-                            </button>
-                            <button
-                              onClick={() => m.connectionId && handleRespond(m.connectionId, "DECLINED")}
-                              className="btn-outline text-sm py-2 px-4 flex items-center gap-1.5"
-                              style={{ color: "var(--error)" }}
-                              disabled={respondingTo === m.connectionId}
-                            >
-                              <X size={14} strokeWidth={1.5} />
-                              {t("decline_btn", language)}
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleConnect(m.userId, m.mode, m.score)}
-                            className="btn-primary text-sm py-2 px-4 w-full flex items-center justify-center gap-1.5"
-                            disabled={connectingTo === m.userId}
-                          >
-                            {connectingTo === m.userId ? (
-                              <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />
-                            ) : (
-                              <UserPlus size={14} strokeWidth={1.5} />
-                            )}
-                            {t("connect_btn", language)}
-                          </button>
-                        )}
+                          );
+                        })()}
+
+                        {/* Secondary: view profile */}
+                        <button
+                          onClick={() => router.push(`/profile/${m.userId}`)}
+                          className="btn-outline text-xs py-1.5 px-4 w-full flex items-center justify-center gap-1.5"
+                        >
+                          <ExternalLink size={12} strokeWidth={1.5} />
+                          {t("view_profile", language)}
+                        </button>
                       </div>
                     </div>
                   )}
